@@ -1,0 +1,13 @@
+# Node / Electron
+node_modules/
+hub-app/node_modules/
+
+# Builds / dist
+dist/
+hub-app/dist/
+hub-app/dist/win-unpacked/
+hub-app/dist/*.exe
+
+# Logs / misc
+*.log
+.DS_Store

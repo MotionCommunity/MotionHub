@@ -1,0 +1,38 @@
+{
+  "name": "motion-hub-staff",
+  "version": "0.1.0",
+  "description": "Motion Staff Hub — desktop app for tournament staff tooling.",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win portable",
+    "build:drive": "electron-builder --win portable && node copy-latest.js",
+    "build:installer": "electron-builder --win"
+  },
+  "build": {
+    "appId": "com.motioncommunity.staffhub",
+    "productName": "Motion Staff Hub",
+    "directories": { "output": "dist" },
+    "files": ["main.js", "preload.js", "build-type.js", "rules-editor.js", "index.html", "styles.css", "renderer.js", "assets/**"],
+    "win": {
+      "target": ["portable", "nsis"],
+      "icon": "assets/motion-logo.png.png",
+      "signAndEditExecutable": false
+    },
+    "portable": {
+      "artifactName": "Motion-Staff-Hub-${version}.exe"
+    },
+    "nsis": {
+      "oneClick": true,
+      "artifactName": "Motion-Staff-Hub-Setup-${version}.exe"
+    }
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "electron": "^41.0.1",
+    "electron-builder": "^26.8.1"
+  }
+}

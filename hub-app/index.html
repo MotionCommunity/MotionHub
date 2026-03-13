@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Motion Hub — Staff</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="styles.css" />
+    <script src="build-type.js"></script>
+    <script src="rules-editor.js"></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">
+            <img
+              src="assets/motion-logo.png.png"
+              alt="Motion logo"
+              class="brand-logo"
+            />
+          </div>
+          <div class="brand-text">
+            <span class="brand-title">MOTION</span>
+            <span class="brand-subtitle">Staff Hub</span>
+          </div>
+        </div>
+        <nav class="nav">
+          <button class="nav-item active" data-section="home">Home</button>
+          <button class="nav-item" data-section="rules">Rules</button>
+          <button class="nav-item" data-section="stats">Stats</button>
+          <button class="nav-item" data-section="tournament">Tournament</button>
+          <button class="nav-item" data-section="forms">Forms</button>
+          <button class="nav-item" data-section="notes">Staff Notes</button>
+          <button class="nav-item" data-section="socials">Socials</button>
+          <button type="button" class="nav-item nav-update-link" id="check-for-updates-btn" style="display:none;">Check for updates</button>
+        </nav>
+      </aside>
+
+      <main class="content">
+        <section id="section-home" class="section visible">
+          <h1 class="headline">Welcome to Motion Staff Hub</h1>
+          <p class="lead">
+            All your tournament links and tools in one place. Staff only.
+          </p>
+          <div class="cards">
+            <div class="card">
+              <h2>Official Rules</h2>
+              <p>Review the current Motion official rules before every event.</p>
+              <button
+                class="primary"
+                data-open-section="rules"
+              >
+                Open Rules
+              </button>
+            </div>
+            <div class="card">
+              <h2>Registration & Sheets</h2>
+              <p>Access the player registration form and tournament spreadsheet.</p>
+              <button
+                class="primary"
+                data-open-section="forms"
+              >
+                Open Forms
+              </button>
+            </div>
+            <div class="card">
+              <h2>Discord</h2>
+              <p>Jump straight into the Motion Discord server.</p>
+              <div class="discord-link-config">
+                <label class="field">
+                  <span class="field-label">Discord server invite URL</span>
+                  <input type="url" id="discord-url-input" class="discord-url-input" placeholder="https://discord.gg/..." />
+                </label>
+                <button type="button" class="secondary" id="discord-url-save">Save link</button>
+              </div>
+              <button
+                class="secondary discord-link-btn"
+                data-link-key="discord"
+                data-link="https://discord.gg/cdZgZZUvpW"
+              >
+                Join Discord
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <section id="section-rules" class="section">
+          <header class="section-header">
+            <h1>Official Rules</h1>
+            <div class="rules-actions">
+              <button type="button" class="rules-tab active" data-rules-tab="preview">Preview</button>
+              <button type="button" class="rules-tab" data-rules-tab="easy">Easy Edit</button>
+              <button type="button" class="rules-tab" data-rules-tab="source">Source</button>
+              <button type="button" class="secondary" data-link="https://motioncommunity.github.io/official-rules/">Open in browser</button>
+            </div>
+          </header>
+          <div id="rules-preview-pane" class="rules-pane visible">
+            <iframe
+              title="Official rules"
+              src="https://motioncommunity.github.io/official-rules/"
+              class="rules-iframe"
+            ></iframe>
+          </div>
+          <div id="rules-easy-pane" class="rules-pane">
+            <p class="muted rules-easy-intro">Edit rules by section. The preview on the right shows your local edits as you type. Use &quot;Load from GitHub&quot; only when you want to pull the latest rules from the repo (you’ll be asked to confirm so you don’t lose progress).</p>
+            <div class="rules-editor-toolbar">
+              <button type="button" class="secondary" id="rules-easy-load-btn">Load from GitHub</button>
+              <button type="button" class="primary" id="rules-easy-submit-btn">Submit suggested changes</button>
+              <span class="master-only">
+                <button type="button" class="primary" id="rules-easy-publish-btn">Publish</button>
+                <button type="button" class="secondary" id="rules-easy-load-suggested-btn">Load staff suggestion</button>
+              </span>
+              <span id="rules-easy-status" class="status"></span>
+            </div>
+            <div class="rules-easy-split" id="rules-easy-split">
+              <div class="rules-easy-editor" id="rules-easy-editor-pane">
+                <h3 class="rules-easy-pane-title">Edit</h3>
+                <div id="rules-easy-sections" class="rules-easy-sections"></div>
+              </div>
+              <div class="rules-easy-resizer" id="rules-easy-resizer" title="Drag to resize"></div>
+              <div class="rules-easy-preview-wrap" id="rules-easy-preview-pane">
+                <h3 class="rules-easy-pane-title">Preview</h3>
+                <div class="rules-easy-preview-placeholder" id="rules-easy-preview-placeholder">Preview will appear here as you edit.</div>
+                <iframe id="rules-easy-preview-iframe" class="rules-easy-preview-iframe" title="Live preview" sandbox="allow-same-origin" tabindex="-1"></iframe>
+              </div>
+            </div>
+          </div>
+          <div id="rules-source-pane" class="rules-pane">
+            <div class="rules-editor-toolbar">
+              <button type="button" class="secondary" id="rules-load-btn">Load from GitHub</button>
+              <span class="master-only">
+                <button type="button" class="primary" id="rules-publish-btn">Publish</button>
+                <button type="button" class="secondary" id="rules-rollback-btn">Rollback</button>
+                <span class="rules-token-wrap">
+                <input type="password" id="rules-token-input" class="rules-token-input" placeholder="GitHub token (for Publish)" />
+                <button type="button" class="secondary" id="rules-token-save">Save token</button>
+                </span>
+              </span>
+              <span id="rules-editor-status" class="status"></span>
+            </div>
+            <textarea id="rules-source-editor" class="rules-source-editor" spellcheck="false" placeholder="Click “Load from GitHub” to fetch the current rules (index.html)."></textarea>
+          </div>
+          <div id="rules-rollback-modal" class="rules-modal" hidden>
+            <div class="rules-modal-content">
+              <h2>Rollback to previous version</h2>
+              <p class="muted">Choose a commit to restore. The current content will be replaced and then you can Publish.</p>
+              <ul id="rules-commit-list" class="rules-commit-list"></ul>
+              <div class="rules-modal-actions">
+                <button type="button" class="secondary" id="rules-rollback-cancel">Cancel</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="section-stats" class="section">
+          <header class="section-header">
+            <h1>Tournament Stats</h1>
+            <button type="button" class="secondary" data-link="https://motioncommunity.github.io/stats/">
+              Open in browser
+            </button>
+          </header>
+          <p class="lead muted">Motion RL — official tournament stats and Motion Rating™ leaderboards.</p>
+          <iframe
+            title="Tournament Stats"
+            src="https://motioncommunity.github.io/stats/"
+            class="rules-iframe stats-iframe"
+          ></iframe>
+        </section>
+
+        <section id="section-tournament" class="section">
+          <header class="section-header">
+            <h1>Tournament App</h1>
+          </header>
+          <p class="lead muted">Launch your Windows tournament application from the hub. Set the path once, then open it with one click.</p>
+          <div class="tournament-config">
+            <label class="field">
+              <span class="field-label">Path to Tournament application (.exe)</span>
+              <input type="text" id="tournament-app-path" class="tournament-path-input" placeholder="C:\Path\To\YourTournamentApp.exe" />
+            </label>
+            <div class="tournament-actions">
+              <button type="button" class="secondary" id="tournament-browse-btn">Browse…</button>
+              <button type="button" class="secondary" id="tournament-save-path-btn">Save path</button>
+              <button type="button" class="primary" id="tournament-launch-btn">Open Tournament App</button>
+            </div>
+            <p id="tournament-status" class="status"></p>
+            <div class="master-only tournament-bot-block">
+              <hr class="tournament-divider" />
+              <h3 class="tournament-bot-title">Discord Bot (Master only)</h3>
+              <p class="muted tournament-bot-desc">Start the Motion RL bot from the hub. Your PC must stay on for the bot to stay online.</p>
+              <label class="field">
+                <span class="field-label">Path to Motion Bot folder</span>
+                <input type="text" id="tournament-bot-path" class="tournament-path-input" placeholder="C:\Users\Halep\MotionBot" />
+              </label>
+              <div class="tournament-actions">
+                <button type="button" class="secondary" id="tournament-bot-browse-btn">Browse…</button>
+                <button type="button" class="secondary" id="tournament-bot-save-btn">Save path</button>
+                <button type="button" class="primary" id="tournament-bot-start-btn">Start Bot</button>
+              </div>
+              <p id="tournament-bot-status" class="status"></p>
+            </div>
+          </div>
+        </section>
+
+        <section id="section-forms" class="section">
+          <header class="section-header">
+            <h1>Forms & Sheets</h1>
+          </header>
+          <div class="link-list">
+            <button
+              class="link-row"
+              data-link="https://docs.google.com/forms/d/e/1FAIpQLSdBZ8y-1mT-5oqMa0CZPHQ8qwDFb182qHcFj0cKY22Aoo6XIw/viewform?usp=sharing&ouid=105837336097787922641"
+            >
+              <span class="link-title">Motion Registration Form</span>
+              <span class="link-subtitle">Rocket League tournament sign-ups</span>
+            </button>
+            <button
+              class="link-row"
+              data-link="https://docs.google.com/spreadsheets/d/1Clh5K3iq2MbFtr1LCymPI-eC2766kaLT35ozNxukZ84/edit?usp=sharing"
+            >
+              <span class="link-title">Tournament Spreadsheet</span>
+              <span class="link-subtitle">Player list, brackets, and notes</span>
+            </button>
+          </div>
+        </section>
+
+        <section id="section-notes" class="section">
+          <header class="section-header">
+            <h1>Staff Notes (Rules Suggestions)</h1>
+          </header>
+          <p class="muted">
+            Add notes or suggestions for rule changes. They’re saved on this device and, if a sync URL is set, sent to the team so the master hub can review them.
+          </p>
+          <div class="notes-sync-config">
+            <label class="field">
+              <span class="field-label">Notes sync URL (optional)</span>
+              <span class="field-hint">Set once so your notes sync to the team. Ask your admin for the URL.</span>
+              <input type="url" id="notes-sync-url" class="notes-sync-input" placeholder="https://your-notes-api.vercel.app" />
+            </label>
+            <button type="button" class="secondary" id="notes-sync-save">Save sync URL</button>
+          </div>
+          <form id="notes-form" class="notes-form">
+            <label class="field">
+              <span class="field-label">Section / Topic</span>
+              <input
+                type="text"
+                name="topic"
+                placeholder="e.g. Disconnections, Prize Pool, 2v2 Format"
+                required
+              />
+            </label>
+            <label class="field">
+              <span class="field-label">Your Note</span>
+              <textarea
+                name="body"
+                rows="6"
+                placeholder="Describe the suggested change or issue with the current rules..."
+                required
+              ></textarea>
+            </label>
+            <button type="submit" class="primary" id="notes-submit-btn">Save Note</button>
+            <p id="notes-status" class="status"></p>
+          </form>
+          <div class="notes-list">
+            <h2>Saved Notes on This Device</h2>
+            <ul id="notes-items"></ul>
+          </div>
+          <div class="notes-list synced-notes-block">
+            <h2>Synced Notes (from all staff)</h2>
+            <p class="muted">Load notes that staff have synced. Use this on the master hub to review suggestions.</p>
+            <button type="button" class="secondary" id="notes-load-synced">Load synced notes</button>
+            <ul id="notes-synced-items"></ul>
+          </div>
+        </section>
+
+        <section id="section-socials" class="section">
+          <header class="section-header">
+            <h1>Social & Community</h1>
+          </header>
+          <div class="link-list">
+            <button
+              class="link-row discord-link-btn"
+              data-link-key="discord"
+              data-link="https://discord.gg/cdZgZZUvpW"
+            >
+              <span class="link-title">Motion Discord</span>
+              <span class="link-subtitle">Primary hub for all tournaments</span>
+            </button>
+            <button
+              class="link-row"
+              data-link="https://motioncommunity.github.io/official-rules/"
+            >
+              <span class="link-title">Official Rules Site</span>
+              <span class="link-subtitle">Public rules and formats page</span>
+            </button>
+            <button
+              class="link-row"
+              data-link="https://motioncommunity.github.io/stats/"
+            >
+              <span class="link-title">Tournament Stats Dashboard</span>
+              <span class="link-subtitle">Motion RL — player stats and leaderboards</span>
+            </button>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="renderer.js"></script>
+  </body>
+</html>
+

@@ -1,0 +1,12 @@
+{
+  "version": 2,
+  "builds": [
+    { "src": "api/*.js", "use": "@vercel/node" }
+  ],
+  "routes": [
+    { "src": "/api/notes", "dest": "/api/notes.js" },
+    { "src": "/api/note", "dest": "/api/note.js" },
+    { "src": "/api/suggested-rules", "dest": "/api/suggested-rules.js" },
+    { "src": "/api/tournament-sync", "dest": "/api/tournament-sync.js" }
+  ]
+}

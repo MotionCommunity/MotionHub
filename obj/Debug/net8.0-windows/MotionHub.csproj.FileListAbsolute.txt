@@ -1,0 +1,13 @@
+C:\Users\Halep\MotionHub\obj\Debug\net8.0-windows\MainWindow.g.cs
+C:\Users\Halep\MotionHub\obj\Debug\net8.0-windows\App.g.cs
+C:\Users\Halep\MotionHub\obj\Debug\net8.0-windows\MotionHub_MarkupCompile.cache
+C:\Users\Halep\MotionHub\obj\Debug\net8.0-windows\MotionHub_MarkupCompile.lref
+C:\Users\Halep\MotionHub\obj\Debug\net8.0-windows\MainWindow.baml
+C:\Users\Halep\MotionHub\obj\Debug\net8.0-windows\MotionHub.g.resources
+C:\Users\Halep\MotionHub\obj\Debug\net8.0-windows\MotionHub.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\Halep\MotionHub\obj\Debug\net8.0-windows\MotionHub.AssemblyInfoInputs.cache
+C:\Users\Halep\MotionHub\obj\Debug\net8.0-windows\MotionHub.AssemblyInfo.cs
+C:\Users\Halep\MotionHub\obj\Debug\net8.0-windows\MotionHub.csproj.CoreCompileInputs.cache
+C:\Users\Halep\MotionHub\obj\Debug\net8.0-windows\MotionHub.dll
+C:\Users\Halep\MotionHub\obj\Debug\net8.0-windows\refint\MotionHub.dll
+C:\Users\Halep\MotionHub\obj\Debug\net8.0-windows\MotionHub.pdb

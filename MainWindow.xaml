@@ -1,0 +1,249 @@
+<Window x:Class="MotionHub.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:MotionHub"
+        mc:Ignorable="d"
+        Title="{Binding WindowTitle}"
+        Height="640" Width="980"
+        WindowStartupLocation="CenterScreen"
+        Background="{DynamicResource Bg}">
+    <Window.Resources>
+        <!-- Motion-ish theme: dark, sharp, electric accent -->
+        <Color x:Key="BgC">#0B0F14</Color>
+        <Color x:Key="PanelC">#0F1620</Color>
+        <Color x:Key="Panel2C">#121C27</Color>
+        <Color x:Key="StrokeC">#253244</Color>
+        <Color x:Key="TextC">#EAF2FF</Color>
+        <Color x:Key="MutedC">#8EA1B8</Color>
+        <Color x:Key="FaintC">#607892</Color>
+        <Color x:Key="AccentC">#49D3FF</Color>
+        <SolidColorBrush x:Key="Bg" Color="{StaticResource BgC}"/>
+        <SolidColorBrush x:Key="Panel" Color="{StaticResource PanelC}"/>
+        <SolidColorBrush x:Key="Panel2" Color="{StaticResource Panel2C}"/>
+        <SolidColorBrush x:Key="Stroke" Color="{StaticResource StrokeC}"/>
+        <SolidColorBrush x:Key="Text" Color="{StaticResource TextC}"/>
+        <SolidColorBrush x:Key="Muted" Color="{StaticResource MutedC}"/>
+        <SolidColorBrush x:Key="Faint" Color="{StaticResource FaintC}"/>
+        <SolidColorBrush x:Key="Accent" Color="{StaticResource AccentC}"/>
+
+        <FontFamily x:Key="UiFont">Segoe UI Variable</FontFamily>
+        <FontFamily x:Key="DisplayFont">Bahnschrift</FontFamily>
+
+        <Style TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="{StaticResource UiFont}"/>
+        </Style>
+
+        <Style TargetType="Button" x:Key="PillButton">
+            <Setter Property="FontFamily" Value="{StaticResource UiFont}"/>
+            <Setter Property="Background" Value="{StaticResource Panel2}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource Stroke}"/>
+            <Setter Property="Foreground" Value="{StaticResource Text}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="10"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter Margin="{TemplateBinding Padding}"
+                                              HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource Accent}"/>
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource Panel}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#0B111A"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.45"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="TextBox" x:Key="MotionTextBox">
+            <Setter Property="FontFamily" Value="{StaticResource UiFont}"/>
+            <Setter Property="Background" Value="{StaticResource Panel}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource Stroke}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Foreground" Value="{StaticResource Text}"/>
+            <Setter Property="CaretBrush" Value="{StaticResource Text}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="12">
+                            <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="ComboBox" x:Key="MotionComboBox">
+            <Setter Property="FontFamily" Value="{StaticResource UiFont}"/>
+            <Setter Property="Background" Value="{StaticResource Panel}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource Stroke}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Foreground" Value="{StaticResource Text}"/>
+        </Style>
+
+        <Style TargetType="Button" x:Key="TileButton">
+            <Setter Property="FontFamily" Value="{StaticResource UiFont}"/>
+            <Setter Property="Background" Value="{StaticResource Panel}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource Stroke}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Foreground" Value="{StaticResource Text}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="16"
+                                SnapsToDevicePixels="True">
+                            <Grid>
+                                <!-- subtle top sheen -->
+                                <Border Opacity="0.55" CornerRadius="16">
+                                    <Border.Background>
+                                        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                            <GradientStop Color="#1A2A3A" Offset="0"/>
+                                            <GradientStop Color="#00000000" Offset="0.65"/>
+                                        </LinearGradientBrush>
+                                    </Border.Background>
+                                </Border>
+                                <ContentPresenter Margin="{TemplateBinding Padding}"/>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource Accent}"/>
+                                <Setter TargetName="Bd" Property="Effect">
+                                    <Setter.Value>
+                                        <DropShadowEffect Color="#49D3FF" BlurRadius="18" ShadowDepth="0" Opacity="0.18"/>
+                                    </Setter.Value>
+                                </Setter>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#0B111A"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="22">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0" Margin="0,0,0,14">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Orientation="Vertical">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="//" FontFamily="{StaticResource DisplayFont}" FontSize="16" Foreground="{StaticResource Accent}" Margin="0,7,10,0"/>
+                    <TextBlock Text="{Binding WindowTitle}" FontFamily="{StaticResource DisplayFont}" FontSize="30" FontWeight="SemiBold" Foreground="{StaticResource Text}"/>
+                </StackPanel>
+                <TextBlock Text="{Binding Profile, StringFormat=Profile: {0}}" FontSize="12" Foreground="{StaticResource Muted}" Margin="0,4,0,0"/>
+            </StackPanel>
+
+            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Content="Create Staff Config"
+                        Command="{Binding CopyStaffConfigCommand}"
+                        Padding="14,8"
+                        Style="{StaticResource PillButton}"
+                        Margin="0,0,10,0" />
+                <Button Content="Reload"
+                        Command="{Binding ReloadCommand}"
+                        Padding="14,8"
+                        Style="{StaticResource PillButton}" />
+            </StackPanel>
+        </Grid>
+
+        <Grid Grid.Row="1" Margin="0,0,0,14">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="2*"/>
+                <ColumnDefinition Width="1*"/>
+            </Grid.ColumnDefinitions>
+
+            <TextBox Grid.Column="0"
+                     Text="{Binding Search, UpdateSourceTrigger=PropertyChanged}"
+                     Height="38"
+                     Padding="12,8"
+                     FontSize="14"
+                     Style="{StaticResource MotionTextBox}"/>
+
+            <ComboBox Grid.Column="1"
+                      ItemsSource="{Binding Categories}"
+                      SelectedItem="{Binding SelectedCategory}"
+                      Height="38"
+                      Margin="12,0,0,0"
+                      FontSize="14"
+                      Style="{StaticResource MotionComboBox}"/>
+        </Grid>
+
+        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+            <ItemsControl ItemsSource="{Binding FilteredItems}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Button Command="{Binding DataContext.RunItemCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                CommandParameter="{Binding}"
+                                Width="290" Height="110"
+                                Margin="0,0,14,14"
+                                Padding="14"
+                                Style="{StaticResource TileButton}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Border Width="48" Height="48" CornerRadius="14" Background="{StaticResource Panel2}" BorderBrush="{StaticResource Stroke}" BorderThickness="1">
+                                    <TextBlock Text="{Binding Icon}" FontSize="22" VerticalAlignment="Center" HorizontalAlignment="Center" Foreground="{StaticResource Text}"/>
+                                </Border>
+                                <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding Title}" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource Text}"/>
+                                    <TextBlock Text="{Binding Subtitle}" FontSize="12" Foreground="{StaticResource Muted}" TextTrimming="CharacterEllipsis" Margin="0,4,0,0"/>
+                                    <TextBlock Text="{Binding Category}" FontSize="11" Foreground="{StaticResource Faint}" Margin="0,6,0,0"/>
+                                </StackPanel>
+                            </Grid>
+                        </Button>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+
+        <TextBlock Grid.Row="3"
+                   Text="Tip: Edit hub.config.json next to the .exe to add more tiles (apps, links, bot start commands)."
+                   Foreground="{StaticResource Faint}"
+                   FontSize="12"/>
+    </Grid>
+</Window>
