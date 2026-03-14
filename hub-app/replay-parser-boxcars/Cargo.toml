@@ -1,0 +1,9 @@
+[package]
+name = "motion-replay-parse"
+version = "0.1.0"
+edition = "2021"
+description = "Rocket League replay parser using boxcars — outputs full replay JSON for Motion Hub"
+
+[dependencies]
+boxcars = "0.10"
+serde_json = "1.0"

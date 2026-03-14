@@ -13,7 +13,7 @@
     "appId": "com.motioncommunity.staffhub",
     "productName": "Motion Staff Hub",
     "directories": { "output": "dist" },
-    "files": ["main.js", "preload.js", "build-type.js", "rules-editor.js", "index.html", "styles.css", "renderer.js", "assets/**"],
+    "files": ["main.js", "preload.js", "build-type.js", "rules-editor.js", "stats-editor.js", "tournament-db.js", "google-sheets.js", "replay-parser.js", "index.html", "styles.css", "renderer.js", "assets/**"],
     "win": {
       "target": ["portable", "nsis"],
       "icon": "assets/motion-logo.png.png",
@@ -31,6 +31,10 @@
   "author": "",
   "license": "ISC",
   "type": "commonjs",
+  "dependencies": {
+    "googleapis": "^144.0.0",
+    "sql.js": "^1.11.0"
+  },
   "devDependencies": {
     "electron": "^41.0.1",
     "electron-builder": "^26.8.1"

@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="styles.css" />
     <script src="build-type.js"></script>
     <script src="rules-editor.js"></script>
+    <script src="stats-editor.js"></script>
   </head>
   <body>
     <div class="app-shell">
@@ -28,12 +29,20 @@
           <button class="nav-item active" data-section="home">Home</button>
           <button class="nav-item" data-section="rules">Rules</button>
           <button class="nav-item" data-section="stats">Stats</button>
-          <button class="nav-item" data-section="tournament">Tournament</button>
+          <button class="nav-item nav-item-with-dot" data-section="tournament" id="nav-item-tournament">Tournament</button>
           <button class="nav-item" data-section="forms">Forms</button>
           <button class="nav-item" data-section="notes">Staff Notes</button>
+          <button class="nav-item" data-section="tools">Tools</button>
           <button class="nav-item" data-section="socials">Socials</button>
           <button type="button" class="nav-item nav-update-link" id="check-for-updates-btn" style="display:none;">Check for updates</button>
         </nav>
+        <div class="sidebar-handle">
+          <div class="sidebar-handle-row">
+            <label class="sidebar-handle-label">Your handle</label>
+            <button type="button" class="sidebar-handle-edit-btn" id="staff-handle-edit-btn" title="Change handle (staff)">Edit</button>
+          </div>
+          <input type="text" id="staff-handle-input" class="sidebar-handle-input" placeholder="e.g. Alex" maxlength="32" readonly />
+        </div>
       </aside>
 
       <main class="content">
@@ -66,16 +75,9 @@
             <div class="card">
               <h2>Discord</h2>
               <p>Jump straight into the Motion Discord server.</p>
-              <div class="discord-link-config">
-                <label class="field">
-                  <span class="field-label">Discord server invite URL</span>
-                  <input type="url" id="discord-url-input" class="discord-url-input" placeholder="https://discord.gg/..." />
-                </label>
-                <button type="button" class="secondary" id="discord-url-save">Save link</button>
-              </div>
               <button
+                type="button"
                 class="secondary discord-link-btn"
-                data-link-key="discord"
                 data-link="https://discord.gg/cdZgZZUvpW"
               >
                 Join Discord
@@ -155,48 +157,689 @@
         <section id="section-stats" class="section">
           <header class="section-header">
             <h1>Tournament Stats</h1>
-            <button type="button" class="secondary" data-link="https://motioncommunity.github.io/stats/">
-              Open in browser
-            </button>
+            <div class="rules-actions">
+              <button type="button" class="rules-tab stats-tab active" data-stats-tab="preview">Preview</button>
+              <button type="button" class="rules-tab stats-tab" data-stats-tab="edit">Easy Edit</button>
+              <button type="button" class="rules-tab stats-tab" data-stats-tab="source">Source</button>
+              <button type="button" class="secondary" data-link="https://motioncommunity.github.io/stats/">Open in browser</button>
+            </div>
           </header>
-          <p class="lead muted">Motion RL — official tournament stats and Motion Rating™ leaderboards.</p>
-          <iframe
-            title="Tournament Stats"
-            src="https://motioncommunity.github.io/stats/"
-            class="rules-iframe stats-iframe"
-          ></iframe>
+          <div id="stats-preview-pane" class="rules-pane visible">
+            <iframe title="Tournament Stats" src="https://motioncommunity.github.io/stats/" class="rules-iframe"></iframe>
+          </div>
+          <div id="stats-edit-pane" class="rules-pane">
+            <p class="muted rules-easy-intro">Edit stats by section. The preview on the right shows your local edits as you type. Use &quot;Load from GitHub&quot; only when you want to pull the latest from the repo (you&apos;ll be asked to confirm so you don&apos;t lose progress).</p>
+            <div class="rules-editor-toolbar">
+              <button type="button" class="secondary" id="stats-load-btn">Load from GitHub</button>
+              <button type="button" class="primary" id="stats-submit-btn">Submit suggested changes</button>
+              <span class="master-only">
+                <button type="button" class="primary" id="stats-publish-btn">Publish</button>
+                <button type="button" class="secondary" id="stats-load-suggested-btn">Load staff suggestion</button>
+                <button type="button" class="secondary" id="stats-insert-markers-btn" title="Add MOTION-HUB-EDIT comments so the hub can always find hero and upcoming">Insert markers</button>
+                <span class="rules-token-wrap">
+                  <input type="password" id="stats-token-input" class="rules-token-input" placeholder="GitHub token (for Publish)" />
+                  <button type="button" class="secondary" id="stats-token-save">Save token</button>
+                </span>
+              </span>
+              <span id="stats-edit-status" class="status"></span>
+            </div>
+            <div class="rules-easy-split" id="stats-easy-split">
+              <div class="rules-easy-editor" id="stats-easy-editor-pane">
+                <h3 class="rules-easy-pane-title">Edit</h3>
+                <div id="stats-easy-sections" class="rules-easy-sections stats-edit-sections">
+                  <div class="stats-edit-section">
+                    <span class="stats-easy-block-title">Title &amp; hero (top of stats page)</span>
+                    <label class="stats-edit-label">Tagline (above title)</label>
+                    <input type="text" id="stats-hero-tagline" class="stats-editor-input" placeholder="e.g. // TOURNAMENT STATS" />
+                    <label class="stats-edit-label">Title</label>
+                    <input type="text" id="stats-hero-title" class="stats-editor-input" placeholder="e.g. MOTION" />
+                    <label class="stats-edit-label">Subtitle (text under the title)</label>
+                    <input type="text" id="stats-hero-subtitle" class="stats-editor-input" placeholder="Official tournament stats and Motion Rating™ leaderboards." />
+                    <label class="stats-edit-label">Season label</label>
+                    <input type="text" id="stats-hero-season" class="stats-editor-input" placeholder="e.g. SEASON 1 ACTIVE" />
+                    <label class="stats-edit-label">Formats label</label>
+                    <input type="text" id="stats-hero-formats" class="stats-editor-input" placeholder="e.g. 2V2 · 3V3 · 4V4" />
+                    <label class="stats-edit-label">Game label</label>
+                    <input type="text" id="stats-hero-game" class="stats-editor-input" placeholder="e.g. ROCKET LEAGUE" />
+                    <label class="stats-edit-label">Open label</label>
+                    <input type="text" id="stats-hero-open" class="stats-editor-input" placeholder="e.g. OPEN TO ALL RANKS" />
+                  </div>
+                  <div class="stats-edit-section">
+                    <span class="stats-easy-block-title">Upcoming section</span>
+                    <label class="stats-edit-label">Section title</label>
+                    <input type="text" id="stats-upcoming-title" class="stats-editor-input" placeholder="e.g. Upcoming" />
+                    <label class="stats-edit-label">Body text</label>
+                    <textarea id="stats-upcoming-body" class="stats-editor-textarea" spellcheck="false" placeholder="Next tournament TBD. Check Discord for dates and registration." rows="5"></textarea>
+                  </div>
+                  <div class="stats-edit-section">
+                    <span class="stats-easy-block-title">Tournament highlights</span>
+                    <label class="stats-edit-label">Section title</label>
+                    <input type="text" id="stats-highlights-title" class="stats-editor-input" placeholder="e.g. Tournament highlights" />
+                    <label class="stats-edit-label">Body text (fills the area below the current tournament)</label>
+                    <textarea id="stats-highlights-body" class="stats-editor-textarea" spellcheck="false" placeholder="Key stats and standings. Bracket and leaderboard data are updated automatically on the live site." rows="4"></textarea>
+                  </div>
+                  <div class="stats-edit-section">
+                    <span class="stats-easy-block-title">Leaderboards section</span>
+                    <label class="stats-edit-label">Section title</label>
+                    <input type="text" id="stats-leaderboards-title" class="stats-editor-input" placeholder="e.g. Motion Rating™ Leaderboard" />
+                    <label class="stats-edit-label">Description (above the table)</label>
+                    <textarea id="stats-leaderboards-description" class="stats-editor-textarea" spellcheck="false" placeholder="Season standings. The table below is updated automatically." rows="2"></textarea>
+                  </div>
+                  <div class="stats-edit-section">
+                    <span class="stats-easy-block-title">Footer</span>
+                    <label class="stats-edit-label">Footer text</label>
+                    <textarea id="stats-footer-text" class="stats-editor-textarea" spellcheck="false" placeholder="© Motion · Join Discord for updates. Stats subject to change." rows="3"></textarea>
+                  </div>
+                </div>
+              </div>
+              <div class="rules-easy-resizer" id="stats-easy-resizer" title="Drag to resize"></div>
+              <div class="rules-easy-preview-wrap" id="stats-easy-preview-wrap">
+                <h3 class="rules-easy-pane-title">Preview</h3>
+                <div class="rules-easy-preview-placeholder" id="stats-easy-preview-placeholder">Preview will appear here as you edit.</div>
+                <iframe id="stats-easy-preview-iframe" class="rules-easy-preview-iframe" title="Stats preview" sandbox="allow-same-origin" tabindex="-1"></iframe>
+              </div>
+            </div>
+          </div>
+          <div id="stats-source-pane" class="rules-pane">
+            <div class="rules-editor-toolbar">
+              <button type="button" class="secondary" id="stats-source-load-btn">Load from GitHub</button>
+              <span class="master-only">
+                <button type="button" class="primary" id="stats-source-publish-btn">Publish</button>
+                <span class="rules-token-wrap">
+                  <input type="password" id="stats-source-token-input" class="rules-token-input" placeholder="GitHub token (for Publish)" />
+                  <button type="button" class="secondary" id="stats-source-token-save">Save token</button>
+                </span>
+              </span>
+              <span id="stats-source-status" class="status"></span>
+            </div>
+            <textarea id="stats-source-editor" class="rules-source-editor" spellcheck="false" placeholder="Click &quot;Load from GitHub&quot; to fetch the current stats index.html."></textarea>
+          </div>
         </section>
 
         <section id="section-tournament" class="section">
-          <header class="section-header">
-            <h1>Tournament App</h1>
-          </header>
-          <p class="lead muted">Launch your Windows tournament application from the hub. Set the path once, then open it with one click.</p>
-          <div class="tournament-config">
-            <label class="field">
-              <span class="field-label">Path to Tournament application (.exe)</span>
-              <input type="text" id="tournament-app-path" class="tournament-path-input" placeholder="C:\Path\To\YourTournamentApp.exe" />
-            </label>
-            <div class="tournament-actions">
-              <button type="button" class="secondary" id="tournament-browse-btn">Browse…</button>
-              <button type="button" class="secondary" id="tournament-save-path-btn">Save path</button>
-              <button type="button" class="primary" id="tournament-launch-btn">Open Tournament App</button>
-            </div>
-            <p id="tournament-status" class="status"></p>
-            <div class="master-only tournament-bot-block">
-              <hr class="tournament-divider" />
-              <h3 class="tournament-bot-title">Discord Bot (Master only)</h3>
-              <p class="muted tournament-bot-desc">Start the Motion RL bot from the hub. Your PC must stay on for the bot to stay online.</p>
-              <label class="field">
-                <span class="field-label">Path to Motion Bot folder</span>
-                <input type="text" id="tournament-bot-path" class="tournament-path-input" placeholder="C:\Users\Halep\MotionBot" />
-              </label>
-              <div class="tournament-actions">
-                <button type="button" class="secondary" id="tournament-bot-browse-btn">Browse…</button>
-                <button type="button" class="secondary" id="tournament-bot-save-btn">Save path</button>
-                <button type="button" class="primary" id="tournament-bot-start-btn">Start Bot</button>
+          <div class="tournament-layout">
+            <nav class="tournament-subnav">
+              <button type="button" class="tournament-subnav-item active" data-tournament-sub="registrations">Registrations</button>
+              <button type="button" class="tournament-subnav-item" data-tournament-sub="players">Players DB</button>
+              <button type="button" class="tournament-subnav-item" data-tournament-sub="bracket" data-change-section="tournament-bracket">Bracket</button>
+              <button type="button" class="tournament-subnav-item" data-tournament-sub="results" data-change-section="tournament-results">Match results</button>
+              <button type="button" class="tournament-subnav-item" data-tournament-sub="schedule" data-change-section="tournament-schedule">Schedule</button>
+              <button type="button" class="tournament-subnav-item" data-tournament-sub="draft">Draft board</button>
+              <button type="button" class="tournament-subnav-item" data-tournament-sub="teams">Teams</button>
+              <button type="button" class="tournament-subnav-item" data-tournament-sub="archive">Archive</button>
+              <button type="button" class="tournament-subnav-item" data-tournament-sub="settings">Settings</button>
+            </nav>
+            <div class="tournament-main">
+              <header class="tournament-main-header">
+                <div class="tournament-header-actions">
+                  <label class="field field-inline">
+                    <span class="field-label">Active tournament</span>
+                    <select id="tournament-select" class="tournament-select"></select>
+                  </label>
+                  <button type="button" class="secondary" id="tournament-new-btn">+ New</button>
+                  <span class="master-only"><button type="button" class="secondary" id="tournament-archive-btn">Archive</button></span>
+                </div>
+              </header>
+              <div id="tournament-registrations-pane" class="tournament-pane visible">
+                <p class="tournament-pane-lead muted">Sync from the sheet; eligibility is driven by Approved/Rejected/Pending. Double-click a row to edit salary, notes, and smurf flag.</p>
+                <div class="tournament-toolbar">
+                  <input type="text" id="tournament-reg-search" class="tournament-search-input" placeholder="Search by name, rank, region, Discord, notes…" />
+                  <button type="button" class="primary" id="tournament-sync-btn">Sync from Google Sheet</button>
+                  <span id="tournament-sync-status" class="status"></span>
+                </div>
+                <div class="tournament-table-wrap">
+                  <table id="tournament-registrations-table" class="tournament-table">
+                    <thead>
+                      <tr>
+                        <th class="sortable" data-sort="ign">IGN</th>
+                        <th class="sortable" data-sort="discordUsername">Discord</th>
+                        <th class="sortable" data-sort="rank">Rank</th>
+                        <th class="sortable" data-sort="region">Region</th>
+                        <th class="sortable" data-sort="status">Status</th>
+                        <th class="sortable" data-sort="registeredAt">Registered</th>
+                        <th>Notes</th>
+                        <th class="sortable" data-sort="smurfingSuspicious">Smurf?</th>
+                      </tr>
+                    </thead>
+                    <tbody id="tournament-registrations-tbody"></tbody>
+                  </table>
+                </div>
               </div>
-              <p id="tournament-bot-status" class="status"></p>
+              <div id="tournament-players-pane" class="tournament-pane">
+                <p class="tournament-pane-lead muted">Approved roster. Edit player or remove from roster.</p>
+                <div class="tournament-toolbar">
+                  <input type="text" id="tournament-players-search" class="tournament-search-input" placeholder="Search by name, rank, region, Discord, notes…" />
+                  <button type="button" class="primary" id="tournament-edit-player-btn">Edit player</button>
+                  <button type="button" class="secondary" id="tournament-remove-player-btn">Remove</button>
+                  <span id="tournament-players-status" class="status"></span>
+                </div>
+                <div class="tournament-table-wrap">
+                  <table id="tournament-players-table" class="tournament-table">
+                    <thead>
+                      <tr>
+                        <th class="sortable" data-sort="ign">IGN</th>
+                        <th class="sortable" data-sort="discordUsername">Discord</th>
+                        <th class="sortable" data-sort="rank">Rank</th>
+                        <th class="sortable" data-sort="region">Region</th>
+                        <th class="sortable" data-sort="salary">Salary</th>
+                        <th class="sortable" data-sort="draftedToTeam">Team</th>
+                        <th>Notes</th>
+                        <th class="sortable" data-sort="smurfingSuspicious">Smurf?</th>
+                      </tr>
+                    </thead>
+                    <tbody id="tournament-players-tbody"></tbody>
+                  </table>
+                </div>
+              </div>
+              <div id="tournament-bracket-pane" class="tournament-pane">
+                <h2 class="tournament-pane-title">Bracket setup</h2>
+                <p class="muted tournament-pane-lead">Set format and bracket type (like the Discord bot). Lock format when ready so this tournament stays e.g. 3v3. Add subs to track who can be used as substitutes for games played stats later.</p>
+                <div class="bracket-format-section">
+                  <label class="field">
+                    <span class="field-label">Team size</span>
+                    <select id="tournament-team-size" class="tournament-select-inline">
+                      <option value="1">1v1</option>
+                      <option value="2">2v2</option>
+                      <option value="3" selected>3v3</option>
+                    </select>
+                  </label>
+                  <label class="field">
+                    <span class="field-label">Bracket type</span>
+                    <select id="tournament-bracket-type" class="tournament-select-inline">
+                      <option value="SingleElimination">Single Elimination</option>
+                      <option value="DoubleElimination">Double Elimination</option>
+                      <option value="RoundRobin">Round Robin</option>
+                    </select>
+                  </label>
+                  <label class="field">
+                    <span class="field-label">Default series format</span>
+                    <select id="tournament-series-format" class="tournament-select-inline">
+                      <option value="SingleGame">Best of 1</option>
+                      <option value="BestOf3">Best of 3</option>
+                      <option value="BestOf5" selected>Best of 5</option>
+                      <option value="BestOf7">Best of 7</option>
+                    </select>
+                  </label>
+                  <p class="muted bracket-format-hint">Default applies to early rounds. Add overrides below for semis, finals, etc.</p>
+                  <div class="bracket-round-formats-section">
+                    <h3 class="tournament-pane-subtitle">Per-round series format</h3>
+                    <p class="muted">Override series length by round so e.g. early rounds are Bo3 and finals are Bo7. The Discord bot can read this when generating matches.</p>
+                    <ul id="tournament-round-formats-list" class="tournament-round-formats-list"></ul>
+                    <button type="button" class="secondary" id="tournament-add-round-format-btn">+ Add round override</button>
+                  </div>
+                  <button type="button" class="secondary" id="tournament-save-format-btn">Save format</button>
+                  <button type="button" class="secondary" id="tournament-lock-format-btn">Lock format</button>
+                  <span id="tournament-format-status" class="status"></span>
+                </div>
+                <div class="bracket-teams-section">
+                  <h3 class="tournament-pane-subtitle">Team names &amp; Discord roles</h3>
+                  <p class="muted">Set team names and optional Discord role IDs so when players are drafted to a team, the bot can assign the role and ping them.</p>
+                  <button type="button" class="secondary" id="tournament-add-team-btn">+ Add team</button>
+                  <div id="tournament-teams-list" class="tournament-teams-list"></div>
+                </div>
+                <div class="bracket-subs-section">
+                  <h3 class="tournament-pane-subtitle">Tournament subs (for replays &amp; stats)</h3>
+                  <p class="muted">Subs for the whole tournament. If they play in a replay they can be tracked on the stats page. You can add these after the tournament starts.</p>
+                  <button type="button" class="primary" id="tournament-add-sub-btn">+ Add tournament sub</button>
+                  <ul id="tournament-subs-list" class="tournament-subs-list"></ul>
+                </div>
+              </div>
+              <div id="tournament-locked-modal" class="tournament-modal" hidden>
+                <div class="tournament-modal-content">
+                  <h2>Tournament is locked</h2>
+                  <p class="muted">Unlock format to change teams or players. Go to the Bracket tab and click &quot;Unlock format&quot;.</p>
+                  <div class="tournament-modal-actions">
+                    <button type="button" class="primary" id="tournament-locked-goto-bracket-btn">Go to Bracket</button>
+                    <button type="button" class="secondary" id="tournament-locked-dismiss-btn">Dismiss</button>
+                  </div>
+                </div>
+              </div>
+              <div id="tournament-add-team-modal" class="tournament-modal" hidden>
+                <div class="tournament-modal-content">
+                  <h2>Add team</h2>
+                  <label class="field">
+                    <span class="field-label">Team name</span>
+                    <input type="text" id="tournament-team-name-input" placeholder="e.g. Team Alpha" />
+                  </label>
+                  <label class="field">
+                    <span class="field-label">Discord role ID (optional, for pings)</span>
+                    <input type="text" id="tournament-team-role-input" placeholder="Role ID" />
+                  </label>
+                  <div class="tournament-modal-actions">
+                    <button type="button" class="primary" id="tournament-add-team-save-btn">Save</button>
+                    <button type="button" class="secondary" id="tournament-add-team-cancel-btn">Cancel</button>
+                  </div>
+                </div>
+              </div>
+              <div id="tournament-add-team-sub-modal" class="tournament-modal" hidden>
+                <div class="tournament-modal-content">
+                  <h2>Add sub for <span id="tournament-add-team-sub-team-name"></span></h2>
+                  <p class="muted">Choose a player to add as a sub for this team only.</p>
+                  <select id="tournament-add-team-sub-select" class="tournament-sub-picker"></select>
+                  <div class="tournament-modal-actions">
+                    <button type="button" class="primary" id="tournament-add-team-sub-confirm-btn">Add</button>
+                    <button type="button" class="secondary" id="tournament-add-team-sub-cancel-btn">Cancel</button>
+                  </div>
+                </div>
+              </div>
+              <div id="tournament-results-pane" class="tournament-pane">
+                <h2 class="tournament-pane-title">Match results</h2>
+                <p class="muted tournament-pane-lead">Results from Discord (when players post .replays and the loser runs /confirm). Override or mark for replay if there’s a dispute or not enough games played.</p>
+                <div class="tournament-toolbar">
+                  <button type="button" class="secondary" id="tournament-results-refresh-btn">Refresh</button>
+                  <button type="button" class="primary" id="tournament-results-add-replay-btn">Select .replay files</button>
+                  <span id="tournament-results-status" class="status"></span>
+                </div>
+                <div id="tournament-results-replay-drop" class="tournament-replay-drop" role="button" tabindex="0">
+                  <span class="tournament-replay-drop-text">Drag .replay files here or use the button above</span>
+                </div>
+                <div class="tournament-table-wrap">
+                  <table id="tournament-results-table" class="tournament-table">
+                    <thead>
+                      <tr>
+                        <th>Round</th>
+                        <th>Match</th>
+                        <th>Team A</th>
+                        <th>Team B</th>
+                        <th>Score</th>
+                        <th>Winner</th>
+                        <th>Games</th>
+                        <th>Status</th>
+                        <th>Updated</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody id="tournament-results-tbody"></tbody>
+                  </table>
+                </div>
+                <p class="muted" id="tournament-results-empty">No match results yet. The Discord bot will add results when players post .replays and the loser confirms.</p>
+              </div>
+              <div id="tournament-schedule-pane" class="tournament-pane">
+                <h2 class="tournament-pane-title">Match schedule</h2>
+                <p class="muted tournament-pane-lead">Schedule when matches are called. The Discord bot will ping teams and direct players to the match channel / voice at the scheduled time, or when you click &quot;Start now&quot; (or when staff run /start-match in Discord).</p>
+                <div class="tournament-toolbar">
+                  <button type="button" class="primary" id="tournament-schedule-add-btn">+ Add scheduled match</button>
+                  <button type="button" class="secondary" id="tournament-schedule-refresh-btn">Refresh</button>
+                  <span id="tournament-schedule-status" class="status"></span>
+                </div>
+                <div class="tournament-table-wrap">
+                  <table id="tournament-schedule-table" class="tournament-table">
+                    <thead>
+                      <tr>
+                        <th>Round</th>
+                        <th>Slot</th>
+                        <th>Team A</th>
+                        <th>Team B</th>
+                        <th>Scheduled time</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody id="tournament-schedule-tbody"></tbody>
+                  </table>
+                </div>
+                <p class="muted" id="tournament-schedule-empty">No scheduled matches. Add one to have the bot call the match at that time or when you start it from the hub or Discord.</p>
+              </div>
+              <div id="tournament-schedule-modal" class="tournament-modal" hidden>
+                <div class="tournament-modal-content">
+                  <h2 id="tournament-schedule-modal-title">Add scheduled match</h2>
+                  <p class="muted">Pick teams from the active tournament (roles auto-fill for pings) or use custom. Round and slot can use structure or manual override.</p>
+                  <input type="hidden" id="tournament-schedule-edit-id" />
+                  <label class="field">
+                    <span class="field-label">Round</span>
+                    <select id="tournament-schedule-round-select" class="tournament-schedule-select">
+                      <option value="quarterfinals">Quarter-finals</option>
+                      <option value="semifinals">Semi-finals</option>
+                      <option value="finals">Finals</option>
+                      <option value="default">Default (early rounds)</option>
+                      <option value="__custom__">Custom (type below)</option>
+                    </select>
+                    <input type="text" id="tournament-schedule-round-custom" class="tournament-schedule-custom-input" placeholder="e.g. Quarter-finals" style="display: none; margin-top: 4px;" />
+                  </label>
+                  <label class="field">
+                    <span class="field-label">Match slot</span>
+                    <select id="tournament-schedule-slot-select" class="tournament-schedule-select">
+                      <option value="1">1</option>
+                      <option value="2">2</option>
+                      <option value="3">3</option>
+                      <option value="QF1">QF1</option>
+                      <option value="QF2">QF2</option>
+                      <option value="QF3">QF3</option>
+                      <option value="QF4">QF4</option>
+                      <option value="SF1">SF1</option>
+                      <option value="SF2">SF2</option>
+                      <option value="Finals">Finals</option>
+                      <option value="__custom__">Custom (type below)</option>
+                    </select>
+                    <input type="text" id="tournament-schedule-slot-custom" class="tournament-schedule-custom-input" placeholder="e.g. 1 or QF1" style="display: none; margin-top: 4px;" />
+                  </label>
+                  <label class="field">
+                    <span class="field-label">Team A</span>
+                    <select id="tournament-schedule-team-a-select" class="tournament-schedule-select">
+                      <option value="">— Select team —</option>
+                      <option value="__custom__">— Custom name —</option>
+                    </select>
+                    <input type="text" id="tournament-schedule-team-a-custom" class="tournament-schedule-custom-input" placeholder="Custom team name" style="display: none; margin-top: 4px;" />
+                    <input type="text" id="tournament-schedule-role-a" class="tournament-schedule-role-custom" placeholder="Discord role ID for @ping (optional)" style="display: none; margin-top: 4px;" />
+                  </label>
+                  <label class="field">
+                    <span class="field-label">Team B</span>
+                    <select id="tournament-schedule-team-b-select" class="tournament-schedule-select">
+                      <option value="">— Select team —</option>
+                      <option value="__custom__">— Custom name —</option>
+                    </select>
+                    <input type="text" id="tournament-schedule-team-b-custom" class="tournament-schedule-custom-input" placeholder="Custom team name" style="display: none; margin-top: 4px;" />
+                    <input type="text" id="tournament-schedule-role-b" class="tournament-schedule-role-custom" placeholder="Discord role ID for @ping (optional)" style="display: none; margin-top: 4px;" />
+                  </label>
+                  <p class="muted" id="tournament-schedule-roles-hint" style="font-size: 0.85rem; margin: 0 0 8px;">Role IDs auto-fill from selected teams for @ping. For custom teams, enter role ID above.</p>
+                  <label class="field">
+                    <span class="field-label">Scheduled date &amp; time</span>
+                    <input type="datetime-local" id="tournament-schedule-datetime" />
+                  </label>
+                  <label class="field field-checkbox tournament-schedule-force-now-wrap">
+                    <input type="checkbox" id="tournament-schedule-force-now" />
+                    <span class="field-label">Send immediately (force send now, don&apos;t wait for scheduled time)</span>
+                  </label>
+                  <div class="tournament-modal-actions">
+                    <button type="button" class="primary" id="tournament-schedule-save-btn">Save</button>
+                    <button type="button" class="secondary" id="tournament-schedule-cancel-btn">Cancel</button>
+                  </div>
+                </div>
+              </div>
+              <div id="tournament-draft-pane" class="tournament-pane">
+                <h2 class="tournament-pane-title">Draft board</h2>
+                <p class="muted tournament-pane-lead">Players on the left (search and sort like Players DB); teams on the right. Use preset teams to quickly add saved team names and role IDs, or add custom teams.</p>
+                <div class="draft-preset-teams-section">
+                  <h3 class="tournament-pane-subtitle">Preset teams &amp; custom</h3>
+                  <p class="muted">Add a saved preset to the draft in one click (saves typing and keeps role IDs). Or add a single custom team.</p>
+                  <div class="draft-preset-toolbar">
+                    <select id="tournament-draft-preset-select" class="tournament-select-inline">
+                      <option value="">— Choose preset —</option>
+                    </select>
+                    <button type="button" class="secondary" id="tournament-draft-add-preset-btn">Add preset to draft</button>
+                    <button type="button" class="secondary" id="tournament-draft-save-preset-btn">Save current as preset</button>
+                    <button type="button" class="secondary" id="tournament-draft-add-team-btn">+ Add custom team</button>
+                  </div>
+                  <p class="muted draft-teams-on-draft-label">Teams on this draft:</p>
+                  <div id="tournament-draft-teams-list" class="tournament-draft-teams-list"></div>
+                </div>
+                <div class="draft-board-section">
+                  <h3 class="tournament-pane-subtitle">Players · Teams</h3>
+                  <p class="muted">Search and sort available players (IGN, Discord, rank). Select and add to a team&apos;s roster or as sub; or drag onto a team.</p>
+                  <div class="draft-board-layout">
+                    <div class="draft-available-panel">
+                      <h4 class="draft-available-title">Available players</h4>
+                      <div class="draft-toolbar">
+                        <input type="text" id="tournament-draft-search" class="tournament-search-input" placeholder="Search by IGN, Discord, rank, region, notes…" />
+                        <span id="tournament-draft-players-status" class="status"></span>
+                      </div>
+                      <div class="draft-available-table-wrap">
+                        <table id="tournament-draft-available-table" class="tournament-table draft-available-table">
+                          <thead>
+                            <tr>
+                              <th class="sortable" data-sort="ign">IGN</th>
+                              <th class="sortable" data-sort="discordUsername">Discord</th>
+                              <th class="sortable" data-sort="rank">Rank</th>
+                              <th class="sortable" data-sort="salary">Salary</th>
+                            </tr>
+                          </thead>
+                          <tbody id="tournament-draft-available-tbody"></tbody>
+                        </table>
+                      </div>
+                    </div>
+                    <div id="tournament-draft-board" class="tournament-draft-board"></div>
+                  </div>
+                </div>
+              </div>
+              <div id="tournament-teams-pane" class="tournament-pane">
+                <h2 class="tournament-pane-title">Teams archive &amp; presets</h2>
+                <p class="muted tournament-pane-lead">Manage all teams in the archive (add, edit, delete). Create presets as named profiles that reference teams from the archive. Load a preset when setting up a new tournament so teams are ready.</p>
+                <div class="teams-archive-section">
+                  <h3 class="tournament-pane-subtitle">Team archive</h3>
+                  <p class="muted">All teams you can use. Edit name and Discord role ID; use these in presets and on the draft board.</p>
+                  <button type="button" class="primary" id="tournament-teams-add-btn">+ Add team</button>
+                  <div class="tournament-table-wrap">
+                    <table id="tournament-teams-archive-table" class="tournament-table">
+                      <thead>
+                        <tr>
+                          <th>Name</th>
+                          <th>Discord role ID</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody id="tournament-teams-archive-tbody"></tbody>
+                    </table>
+                  </div>
+                  <p class="muted" id="tournament-teams-archive-empty">No teams in archive. Add teams to use in presets and drafts.</p>
+                </div>
+                <div class="teams-presets-section">
+                  <h3 class="tournament-pane-subtitle">Presets (profiles)</h3>
+                  <p class="muted">A preset is a named set of teams from the archive. Load a preset on the Draft board to apply those teams to the current tournament.</p>
+                  <button type="button" class="primary" id="tournament-teams-create-preset-btn">+ Create preset</button>
+                  <div id="tournament-teams-presets-list" class="teams-presets-list"></div>
+                  <p class="muted" id="tournament-teams-presets-empty">No presets. Create one by selecting teams from the archive.</p>
+                </div>
+              </div>
+              <div id="tournament-team-edit-modal" class="tournament-modal" hidden>
+                <div class="tournament-modal-content">
+                  <h2 id="tournament-team-edit-modal-title">Edit team</h2>
+                  <input type="hidden" id="tournament-team-edit-id" />
+                  <label class="field">
+                    <span class="field-label">Team name</span>
+                    <input type="text" id="tournament-team-edit-name" placeholder="e.g. Legacy" />
+                  </label>
+                  <label class="field">
+                    <span class="field-label">Discord role ID (optional)</span>
+                    <input type="text" id="tournament-team-edit-role" placeholder="Role ID for @ping" />
+                  </label>
+                  <div class="tournament-modal-actions">
+                    <button type="button" class="primary" id="tournament-team-edit-save-btn">Save</button>
+                    <button type="button" class="secondary" id="tournament-team-edit-cancel-btn">Cancel</button>
+                  </div>
+                </div>
+              </div>
+              <div id="tournament-preset-edit-modal" class="tournament-modal" hidden>
+                <div class="tournament-modal-content">
+                  <h2 id="tournament-preset-edit-modal-title">Edit preset</h2>
+                  <input type="hidden" id="tournament-preset-edit-index" />
+                  <label class="field">
+                    <span class="field-label">Preset name</span>
+                    <input type="text" id="tournament-preset-edit-name" placeholder="e.g. Season 1 teams" />
+                  </label>
+                  <label class="field">
+                    <span class="field-label">Teams in this preset</span>
+                    <div id="tournament-preset-edit-teams" class="preset-teams-checkboxes"></div>
+                  </label>
+                  <div class="tournament-modal-actions">
+                    <button type="button" class="primary" id="tournament-preset-edit-save-btn">Save</button>
+                    <button type="button" class="secondary" id="tournament-preset-edit-cancel-btn">Cancel</button>
+                  </div>
+                </div>
+              </div>
+              <div id="tournament-draft-save-preset-modal" class="tournament-modal" hidden>
+                <div class="tournament-modal-content">
+                  <h2>Save current teams as preset</h2>
+                  <p class="muted" id="tournament-draft-save-preset-message">Current draft has <span id="tournament-draft-save-preset-count">0</span> teams. Overwrite an existing preset or create a new one.</p>
+                  <div class="tournament-modal-actions" style="flex-wrap: wrap;">
+                    <button type="button" class="primary" id="tournament-draft-save-preset-overwrite-btn" style="display: none;">Overwrite selected preset</button>
+                    <button type="button" class="primary" id="tournament-draft-save-preset-new-btn">Save as new preset</button>
+                    <button type="button" class="secondary" id="tournament-draft-save-preset-cancel-btn">Cancel</button>
+                  </div>
+                </div>
+              </div>
+              <div id="tournament-draft-add-player-modal" class="tournament-modal" hidden>
+                <div class="tournament-modal-content">
+                  <h2>Add player to <span id="tournament-draft-add-player-team-name"></span></h2>
+                  <p class="muted">Choose a player from the Players DB to assign to this team.</p>
+                  <select id="tournament-draft-add-player-select" class="tournament-sub-picker"></select>
+                  <div class="tournament-modal-actions">
+                    <button type="button" class="primary" id="tournament-draft-add-player-confirm-btn">Add</button>
+                    <button type="button" class="secondary" id="tournament-draft-add-player-cancel-btn">Cancel</button>
+                  </div>
+                </div>
+              </div>
+              <div id="tournament-delete-modal" class="tournament-modal tournament-delete-modal" hidden>
+                <div class="tournament-modal-content tournament-delete-modal-content">
+                  <h2 class="tournament-delete-title">Delete tournament</h2>
+                  <p class="tournament-delete-warning">This will permanently remove the tournament and its draft/team data from this hub. Players are not deleted; their assignment to this tournament is cleared. This cannot be undone.</p>
+                  <p class="tournament-delete-name-prompt">Type the tournament name below to confirm:</p>
+                  <p class="tournament-delete-name-display" id="tournament-delete-name-display"></p>
+                  <label class="field">
+                    <span class="field-label">Tournament name</span>
+                    <input type="text" id="tournament-delete-name-input" placeholder="Type the exact name" autocomplete="off" />
+                  </label>
+                  <div class="tournament-modal-actions">
+                    <button type="button" class="danger" id="tournament-delete-confirm-btn" disabled>Delete</button>
+                    <button type="button" class="secondary" id="tournament-delete-cancel-btn">Cancel</button>
+                  </div>
+                </div>
+              </div>
+              <div id="tournament-result-override-modal" class="tournament-modal" hidden>
+                <div class="tournament-modal-content tournament-result-override-content">
+                  <h2 id="tournament-result-override-title">Override / adjust result</h2>
+                  <p class="muted">Fix score, winner, games played, or mark as disputed/replay. Changes sync to the live API so the bot and other hubs see them.</p>
+                  <input type="hidden" id="tournament-result-override-id" />
+                  <div id="tournament-result-override-new-fields" class="tournament-result-override-new-fields" style="display: none;">
+                    <label class="field">
+                      <span class="field-label">Round</span>
+                      <input type="text" id="tournament-result-override-round" placeholder="e.g. quarterfinals" />
+                    </label>
+                    <label class="field">
+                      <span class="field-label">Match slot</span>
+                      <input type="text" id="tournament-result-override-slot" placeholder="e.g. 1 or QF1" />
+                    </label>
+                  </div>
+                  <label class="field">
+                    <span class="field-label">Team A</span>
+                    <input type="text" id="tournament-result-override-team-a" placeholder="Team name" />
+                  </label>
+                  <label class="field">
+                    <span class="field-label">Team B</span>
+                    <input type="text" id="tournament-result-override-team-b" placeholder="Team name" />
+                  </label>
+                  <label class="field">
+                    <span class="field-label">Winner</span>
+                    <select id="tournament-result-override-winner">
+                      <option value="">Pending</option>
+                      <option value="A">Team A</option>
+                      <option value="B">Team B</option>
+                    </select>
+                  </label>
+                  <label class="field">
+                    <span class="field-label">Score (e.g. 3-1)</span>
+                    <input type="text" id="tournament-result-override-score" placeholder="3-1" />
+                  </label>
+                  <label class="field">
+                    <span class="field-label">Games played</span>
+                    <input type="number" id="tournament-result-override-games-played" min="0" max="99" value="0" />
+                  </label>
+                  <label class="field">
+                    <span class="field-label">Status</span>
+                    <select id="tournament-result-override-status">
+                      <option value="pending">Pending</option>
+                      <option value="confirmed">Confirmed</option>
+                      <option value="disputed">Disputed</option>
+                      <option value="overridden">Overridden</option>
+                      <option value="replay">Replay</option>
+                    </select>
+                  </label>
+                  <label class="field">
+                    <span class="field-label">Staff note (for overrides / disputes)</span>
+                    <textarea id="tournament-result-override-note" rows="2" placeholder="Reason for override or replay"></textarea>
+                  </label>
+                  <div class="tournament-modal-actions">
+                    <button type="button" class="primary" id="tournament-result-override-save-btn">Save</button>
+                    <button type="button" class="secondary" id="tournament-result-override-cancel-btn">Cancel</button>
+                  </div>
+                </div>
+              </div>
+              <div id="tournament-add-sub-modal" class="tournament-modal" hidden>
+                <div class="tournament-modal-content">
+                  <h2>Add substitute</h2>
+                  <p class="muted">Choose an approved player to add as a sub for this tournament.</p>
+                  <select id="tournament-add-sub-select" class="tournament-sub-picker"></select>
+                  <div class="tournament-modal-actions">
+                    <button type="button" class="primary" id="tournament-add-sub-confirm-btn">Add</button>
+                    <button type="button" class="secondary" id="tournament-add-sub-cancel-btn">Cancel</button>
+                  </div>
+                </div>
+              </div>
+              <div id="tournament-archive-pane" class="tournament-pane">
+                <h2 class="tournament-pane-title">Archived tournaments</h2>
+                <p class="muted tournament-pane-lead">Archived tournaments stay here so you can edit GitHub stats and keep career stats for players. Open the stats site to add or update this tournament&apos;s data for the career section.</p>
+                <div class="tournament-table-wrap">
+                  <table id="tournament-archive-table" class="tournament-table">
+                    <thead>
+                      <tr>
+                        <th>Tournament</th>
+                        <th>Archived</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody id="tournament-archive-tbody"></tbody>
+                  </table>
+                </div>
+                <p class="muted" id="tournament-archive-empty">No archived tournaments yet. Use &quot;Archive&quot; on an active tournament to move it here.</p>
+              </div>
+              <div id="tournament-settings-pane" class="tournament-pane">
+                <h2 class="tournament-pane-title">Google Sheet &amp; settings</h2>
+                <p class="muted tournament-pane-lead">Set credentials and spreadsheet so &quot;Sync from Google Sheet&quot; works. Salary, notes, and smurf flag are kept in the hub and never overwritten by sync.</p>
+                <div class="tournament-settings-form">
+                  <label class="field">
+                    <span class="field-label">Path to Google service account JSON</span>
+                    <input type="text" id="tournament-google-credentials" placeholder="C:\path\to\credentials.json" />
+                  </label>
+                  <button type="button" class="secondary" id="tournament-google-browse-btn">Browse…</button>
+                  <label class="field">
+                    <span class="field-label">Spreadsheet ID</span>
+                    <input type="text" id="tournament-spreadsheet-id" placeholder="From the sheet URL: docs.google.com/.../d/SPREADSHEET_ID/..." />
+                  </label>
+                  <label class="field">
+                    <span class="field-label">Sheet name (tab name)</span>
+                    <input type="text" id="tournament-sheet-name" placeholder="Form_Responses" />
+                  </label>
+                  <button type="button" class="primary" id="tournament-settings-save-btn">Save</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div id="tournament-new-modal" class="tournament-modal" hidden>
+            <div class="tournament-modal-content">
+              <h2>New tournament</h2>
+              <label class="field">
+                <span class="field-label">Tournament name</span>
+                <input type="text" id="tournament-new-name-input" placeholder="e.g. Season 4 Week 1" />
+              </label>
+              <div class="tournament-modal-actions">
+                <button type="button" class="primary" id="tournament-new-create-btn">Create</button>
+                <button type="button" class="secondary" id="tournament-new-cancel-btn">Cancel</button>
+              </div>
+            </div>
+          </div>
+          <div id="tournament-player-modal" class="tournament-modal" hidden>
+            <div class="tournament-modal-content">
+              <h2 id="tournament-player-modal-title">Edit player</h2>
+              <input type="hidden" id="tournament-player-edit-id" />
+              <label class="field">
+                <span class="field-label">Salary</span>
+                <input type="number" id="tournament-player-salary" min="1" max="9999" value="10" />
+              </label>
+              <label class="field">
+                <span class="field-label">Discord user ID (optional)</span>
+                <input type="text" id="tournament-player-discord-id" placeholder="Bot uses Discord username from form; add ID only if needed" />
+              </label>
+              <label class="field">
+                <span class="field-label">Notes</span>
+                <textarea id="tournament-player-notes" rows="4"></textarea>
+              </label>
+              <label class="field field-checkbox">
+                <input type="checkbox" id="tournament-player-smurf" />
+                <span>Suspicious for smurfing</span>
+              </label>
+              <div class="tournament-modal-actions">
+                <button type="button" class="primary" id="tournament-player-save-btn">Save</button>
+                <button type="button" class="secondary" id="tournament-player-cancel-btn">Cancel</button>
+              </div>
             </div>
           </div>
         </section>
@@ -228,16 +871,8 @@
             <h1>Staff Notes (Rules Suggestions)</h1>
           </header>
           <p class="muted">
-            Add notes or suggestions for rule changes. They’re saved on this device and, if a sync URL is set, sent to the team so the master hub can review them.
+            Add notes or suggestions for rule changes. They’re saved on this device and synced to the team so the master hub can review them.
           </p>
-          <div class="notes-sync-config">
-            <label class="field">
-              <span class="field-label">Notes sync URL (optional)</span>
-              <span class="field-hint">Set once so your notes sync to the team. Ask your admin for the URL.</span>
-              <input type="url" id="notes-sync-url" class="notes-sync-input" placeholder="https://your-notes-api.vercel.app" />
-            </label>
-            <button type="button" class="secondary" id="notes-sync-save">Save sync URL</button>
-          </div>
           <form id="notes-form" class="notes-form">
             <label class="field">
               <span class="field-label">Section / Topic</span>
@@ -272,14 +907,39 @@
           </div>
         </section>
 
+        <section id="section-tools" class="section">
+          <header class="section-header">
+            <h1>Tools</h1>
+          </header>
+          <p class="lead muted">Quick links to dashboards and developer pages for making adjustments.</p>
+          <div class="link-list">
+            <button type="button" class="link-row" data-link="https://railway.app/dashboard">
+              <span class="link-title">Railway</span>
+              <span class="link-subtitle">Deployments (e.g. Motion bot)</span>
+            </button>
+            <button type="button" class="link-row" data-link="https://vercel.com/dashboard">
+              <span class="link-title">Vercel</span>
+              <span class="link-subtitle">Notes API and serverless deployments</span>
+            </button>
+            <button type="button" class="link-row" data-link="https://github.com/MotionCommunity">
+              <span class="link-title">GitHub — MotionCommunity</span>
+              <span class="link-subtitle">Org and main repos</span>
+            </button>
+            <button type="button" class="link-row" data-link="https://discord.com/developers/applications">
+              <span class="link-title">Discord Developer Portal</span>
+              <span class="link-subtitle">Bot application and OAuth</span>
+            </button>
+          </div>
+        </section>
+
         <section id="section-socials" class="section">
           <header class="section-header">
             <h1>Social & Community</h1>
           </header>
           <div class="link-list">
             <button
+              type="button"
               class="link-row discord-link-btn"
-              data-link-key="discord"
               data-link="https://discord.gg/cdZgZZUvpW"
             >
               <span class="link-title">Motion Discord</span>

@@ -12,6 +12,11 @@ const DEFAULT_STATE = {
   verified: [],
   draftSnapshot: null,
   stagingApproved: [],
+  matchResults: [],
+  scheduledMatches: [],
+  bracketConfig: null,
+  recentChanges: {},
+  stripRolesRequest: null,
   lastUpdated: null,
 };
 
@@ -38,6 +43,11 @@ module.exports = async function handler(req, res) {
         verified: Array.isArray(data.verified) ? data.verified : DEFAULT_STATE.verified,
         draftSnapshot: data.draftSnapshot ?? DEFAULT_STATE.draftSnapshot,
         stagingApproved: Array.isArray(data.stagingApproved) ? data.stagingApproved : DEFAULT_STATE.stagingApproved,
+        matchResults: Array.isArray(data.matchResults) ? data.matchResults : DEFAULT_STATE.matchResults,
+        scheduledMatches: Array.isArray(data.scheduledMatches) ? data.scheduledMatches : DEFAULT_STATE.scheduledMatches,
+        bracketConfig: data.bracketConfig ?? DEFAULT_STATE.bracketConfig,
+        recentChanges: data.recentChanges && typeof data.recentChanges === 'object' ? data.recentChanges : DEFAULT_STATE.recentChanges,
+        stripRolesRequest: data.stripRolesRequest ?? DEFAULT_STATE.stripRolesRequest,
         lastUpdated: data.lastUpdated ?? DEFAULT_STATE.lastUpdated,
       });
     } catch (e) {
@@ -71,12 +81,20 @@ module.exports = async function handler(req, res) {
       if (!Array.isArray(current.queue)) current.queue = [];
       if (!Array.isArray(current.verified)) current.verified = [];
       if (!Array.isArray(current.stagingApproved)) current.stagingApproved = [];
+      if (!Array.isArray(current.matchResults)) current.matchResults = [];
+      if (!Array.isArray(current.scheduledMatches)) current.scheduledMatches = [];
+      if (!current.recentChanges || typeof current.recentChanges !== 'object') current.recentChanges = {};
 
       const next = {
         queue: Array.isArray(body.queue) ? body.queue : current.queue,
         verified: Array.isArray(body.verified) ? body.verified : current.verified,
         draftSnapshot: body.draftSnapshot !== undefined ? body.draftSnapshot : current.draftSnapshot,
         stagingApproved: Array.isArray(body.stagingApproved) ? body.stagingApproved : current.stagingApproved,
+        matchResults: body.matchResults !== undefined ? (Array.isArray(body.matchResults) ? body.matchResults : current.matchResults) : current.matchResults,
+        scheduledMatches: body.scheduledMatches !== undefined ? (Array.isArray(body.scheduledMatches) ? body.scheduledMatches : current.scheduledMatches) : current.scheduledMatches,
+        bracketConfig: body.bracketConfig !== undefined ? body.bracketConfig : current.bracketConfig,
+        recentChanges: body.recentChanges !== undefined ? { ...(current.recentChanges || {}), ...body.recentChanges } : (current.recentChanges || {}),
+        stripRolesRequest: body.stripRolesRequest !== undefined ? body.stripRolesRequest : current.stripRolesRequest,
         lastUpdated: new Date().toISOString(),
       };
 
