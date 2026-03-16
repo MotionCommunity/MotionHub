@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\Halep\\MotionHub\\MotionHub.csproj": {}
+    "c:\\Users\\Halep\\MotionHub\\MotionHub.csproj": {}
   },
   "projects": {
-    "C:\\Users\\Halep\\MotionHub\\MotionHub.csproj": {
+    "c:\\Users\\Halep\\MotionHub\\MotionHub.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\Halep\\MotionHub\\MotionHub.csproj",
+        "projectUniqueName": "c:\\Users\\Halep\\MotionHub\\MotionHub.csproj",
         "projectName": "MotionHub",
-        "projectPath": "C:\\Users\\Halep\\MotionHub\\MotionHub.csproj",
+        "projectPath": "c:\\Users\\Halep\\MotionHub\\MotionHub.csproj",
         "packagesPath": "C:\\Users\\Halep\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\Halep\\MotionHub\\obj\\",
+        "outputPath": "c:\\Users\\Halep\\MotionHub\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\Halep\\AppData\\Roaming\\NuGet\\NuGet.Config"

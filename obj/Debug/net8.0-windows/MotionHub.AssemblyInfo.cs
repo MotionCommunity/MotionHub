@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("MotionHub")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+bde2d56d2ac5e08fc46f82942ecf7557ae616c9a")]
 [assembly: System.Reflection.AssemblyProductAttribute("MotionHub")]
 [assembly: System.Reflection.AssemblyTitleAttribute("MotionHub")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
