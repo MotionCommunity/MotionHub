@@ -5,6 +5,7 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
+    "start:master": "node scripts/run-master.js",
     "build": "electron-builder --win portable",
     "build:drive": "electron-builder --win portable && node copy-latest.js",
     "build:installer": "electron-builder --win"

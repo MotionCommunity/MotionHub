@@ -1,7 +1,6 @@
 const { app, BrowserWindow, shell, ipcMain, Menu, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
-const { spawn } = require('child_process');
 const tournamentDb = require('./tournament-db');
 const googleSheets = require('./google-sheets');
 const replayParser = require('./replay-parser');
@@ -325,29 +324,6 @@ ipcMain.handle('app:openUpdateUrl', () => {
 });
 ipcMain.handle('app:getUpdateUrl', () => CHECK_FOR_UPDATES_URL || '');
 
-// Tournament app (Windows .exe) — path stored in config, launch from hub
-ipcMain.handle('app:getTournamentAppPath', () => loadConfig().tournamentAppPath || '');
-ipcMain.handle('app:setTournamentAppPath', (_event, exePath) => {
-  saveConfig({ tournamentAppPath: (exePath && exePath.trim()) || '' });
-  return true;
-});
-ipcMain.handle('app:pickTournamentAppPath', async () => {
-  const { filePaths } = await dialog.showOpenDialog(BrowserWindow.getFocusedWindow(), {
-    title: 'Select Tournament application',
-    properties: ['openFile'],
-    filters: [{ name: 'Executable', extensions: ['exe'] }],
-  });
-  return filePaths && filePaths[0] ? filePaths[0] : '';
-});
-ipcMain.handle('app:launchTournamentApp', async () => {
-  const exePath = (loadConfig().tournamentAppPath || '').trim();
-  if (!exePath) throw new Error('Tournament app path not set. Set it in the Tournament section.');
-  if (!fs.existsSync(exePath)) throw new Error('Tournament app not found at that path.');
-  const child = spawn(exePath, [], { detached: true, stdio: 'ignore', windowsHide: false });
-  child.unref();
-  return true;
-});
-
 // Replay parsing via boxcars (Rust) — full replay JSON for stats
 ipcMain.handle('replay:parse', async (_event, replayFilePath, headerOnly = false) => {
   const appDir = __dirname;
@@ -358,14 +334,6 @@ ipcMain.handle('replay:parse', async (_event, replayFilePath, headerOnly = false
     appDir,
   });
 });
-ipcMain.handle('replay:getParserPath', () => {
-  return replayParser.getParserPath(__dirname, loadConfig().replayParserPath) || '';
-});
-ipcMain.handle('app:setReplayParserPath', (_event, exePath) => {
-  saveConfig({ replayParserPath: exePath != null ? String(exePath).trim() : '' });
-  return true;
-});
-ipcMain.handle('app:getReplayParserPath', () => loadConfig().replayParserPath || '');
 
 ipcMain.handle('replay:selectFiles', async () => {
   const { filePaths } = await dialog.showOpenDialog(BrowserWindow.getFocusedWindow(), {
@@ -417,18 +385,21 @@ ipcMain.handle('notes:fetch', async () => {
 });
 
 // Suggested rules (staff submit; master fetches to confirm and publish)
-ipcMain.handle('notes:submitSuggestedRules', async (_event, html) => {
+ipcMain.handle('notes:submitSuggestedRules', async (_event, payload) => {
   const base = getNotesSyncBase();
   const url = `${base}/api/suggested-rules`;
   try {
+    const html = typeof payload === 'string' ? payload : (payload && payload.html);
+    const submittedBy = typeof payload === 'object' && payload && payload.submittedBy != null ? String(payload.submittedBy) : '';
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ html: html || '' }),
+      body: JSON.stringify({ html: html || '', submittedBy: submittedBy || '' }),
     });
     const text = await res.text();
     if (!res.ok) return { ok: false, error: text || res.statusText };
-    return { ok: true };
+    const data = text ? JSON.parse(text) : {};
+    return { ok: true, id: data.id };
   } catch (e) {
     return { ok: false, error: e.message };
   }
@@ -439,11 +410,13 @@ ipcMain.handle('notes:fetchSuggestedRules', async () => {
   try {
     const res = await fetch(url);
     const text = await res.text();
-    if (!res.ok) return { ok: false, error: text || res.statusText, html: '' };
+    if (!res.ok) return { ok: false, error: text || res.statusText, list: [], items: [] };
     const data = JSON.parse(text || '{}');
-    return { ok: true, html: data.html || '' };
+    const list = data.list || [];
+    const items = data.items || [];
+    return { ok: true, list, items };
   } catch (e) {
-    return { ok: false, error: e.message, html: '' };
+    return { ok: false, error: e.message, list: [], items: [] };
   }
 });
 
@@ -519,12 +492,6 @@ ipcMain.handle('tournamentSync:update', async (_event, payload) => {
 });
 
 // —— Tournament (in-hub: DB + Google Sheet sync) ——
-ipcMain.handle('tournament:init', () => {
-  const dbPath = path.join(app.getPath('userData'), 'motion-tournament.db');
-  tournamentDb.init(dbPath);
-  return true;
-});
-
 ipcMain.handle('tournament:getList', (_event, status) => {
   return tournamentDb.getTournaments(status);
 });

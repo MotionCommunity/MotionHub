@@ -22,7 +22,7 @@
           </div>
           <div class="brand-text">
             <span class="brand-title">MOTION</span>
-            <span class="brand-subtitle">Staff Hub</span>
+            <span class="brand-subtitle" id="brand-subtitle">Staff Hub</span>
           </div>
         </div>
         <nav class="nav">
@@ -47,8 +47,8 @@
 
       <main class="content">
         <section id="section-home" class="section visible">
-          <h1 class="headline">Welcome to Motion Staff Hub</h1>
-          <p class="lead">
+          <h1 class="headline" id="home-headline">Welcome to Motion Staff Hub</h1>
+          <p class="lead" id="home-lead">
             All your tournament links and tools in one place. Staff only.
           </p>
           <div class="cards">
@@ -97,10 +97,14 @@
             </div>
           </header>
           <div id="rules-preview-pane" class="rules-pane visible">
+            <div class="rules-preview-toolbar">
+              <button type="button" class="secondary" id="rules-preview-refresh-btn" title="Reload to show latest from GitHub">Refresh preview</button>
+            </div>
             <iframe
               title="Official rules"
               src="https://motioncommunity.github.io/official-rules/"
               class="rules-iframe"
+              id="rules-preview-iframe"
             ></iframe>
           </div>
           <div id="rules-easy-pane" class="rules-pane">
@@ -110,7 +114,12 @@
               <button type="button" class="primary" id="rules-easy-submit-btn">Submit suggested changes</button>
               <span class="master-only">
                 <button type="button" class="primary" id="rules-easy-publish-btn">Publish</button>
-                <button type="button" class="secondary" id="rules-easy-load-suggested-btn">Load staff suggestion</button>
+                <select id="rules-suggestions-dropdown" class="rules-suggestions-dropdown" title="Pick a staff suggestion">
+                  <option value="">— Staff suggestions —</option>
+                </select>
+                <button type="button" class="secondary" id="rules-easy-load-suggested-btn">Load selected</button>
+                <button type="button" class="secondary" id="rules-easy-refresh-suggestions-btn" title="Refresh list">Refresh list</button>
+                <button type="button" class="secondary" id="rules-easy-diff-btn">Show changes vs live</button>
               </span>
               <span id="rules-easy-status" class="status"></span>
             </div>
@@ -142,6 +151,16 @@
             </div>
             <textarea id="rules-source-editor" class="rules-source-editor" spellcheck="false" placeholder="Click “Load from GitHub” to fetch the current rules (index.html)."></textarea>
           </div>
+          <div id="rules-diff-modal" class="rules-modal" hidden>
+            <div class="rules-modal-content rules-diff-modal-content">
+              <h2>Changes vs live rules</h2>
+              <p class="muted">Green = added in suggestion, red = removed from live.</p>
+              <div id="rules-diff-body" class="rules-diff-body"></div>
+              <div class="rules-modal-actions">
+                <button type="button" class="secondary" id="rules-diff-close">Close</button>
+              </div>
+            </div>
+          </div>
           <div id="rules-rollback-modal" class="rules-modal" hidden>
             <div class="rules-modal-content">
               <h2>Rollback to previous version</h2>
@@ -165,7 +184,10 @@
             </div>
           </header>
           <div id="stats-preview-pane" class="rules-pane visible">
-            <iframe title="Tournament Stats" src="https://motioncommunity.github.io/stats/" class="rules-iframe"></iframe>
+            <div class="rules-preview-toolbar">
+              <button type="button" class="secondary" id="stats-preview-refresh-btn" title="Reload to show latest from GitHub">Refresh preview</button>
+            </div>
+            <iframe title="Tournament Stats" src="https://motioncommunity.github.io/stats/" class="rules-iframe" id="stats-preview-iframe"></iframe>
           </div>
           <div id="stats-edit-pane" class="rules-pane">
             <p class="muted rules-easy-intro">Edit stats by section. The preview on the right shows your local edits as you type. Use &quot;Load from GitHub&quot; only when you want to pull the latest from the repo (you&apos;ll be asked to confirm so you don&apos;t lose progress).</p>
@@ -187,45 +209,46 @@
               <div class="rules-easy-editor" id="stats-easy-editor-pane">
                 <h3 class="rules-easy-pane-title">Edit</h3>
                 <div id="stats-easy-sections" class="rules-easy-sections stats-edit-sections">
-                  <div class="stats-edit-section">
+                  <p id="stats-easy-load-hint" class="stats-easy-load-hint" style="display: none;">Load from GitHub to see which sections from the stats page you can edit.</p>
+                  <div class="stats-edit-section" data-stats-section="hero">
                     <span class="stats-easy-block-title">Title &amp; hero (top of stats page)</span>
-                    <label class="stats-edit-label">Tagline (above title)</label>
-                    <input type="text" id="stats-hero-tagline" class="stats-editor-input" placeholder="e.g. // TOURNAMENT STATS" />
-                    <label class="stats-edit-label">Title</label>
-                    <input type="text" id="stats-hero-title" class="stats-editor-input" placeholder="e.g. MOTION" />
-                    <label class="stats-edit-label">Subtitle (text under the title)</label>
-                    <input type="text" id="stats-hero-subtitle" class="stats-editor-input" placeholder="Official tournament stats and Motion Rating™ leaderboards." />
-                    <label class="stats-edit-label">Season label</label>
-                    <input type="text" id="stats-hero-season" class="stats-editor-input" placeholder="e.g. SEASON 1 ACTIVE" />
-                    <label class="stats-edit-label">Formats label</label>
-                    <input type="text" id="stats-hero-formats" class="stats-editor-input" placeholder="e.g. 2V2 · 3V3 · 4V4" />
-                    <label class="stats-edit-label">Game label</label>
-                    <input type="text" id="stats-hero-game" class="stats-editor-input" placeholder="e.g. ROCKET LEAGUE" />
-                    <label class="stats-edit-label">Open label</label>
-                    <input type="text" id="stats-hero-open" class="stats-editor-input" placeholder="e.g. OPEN TO ALL RANKS" />
+                    <label class="stats-edit-label" data-stats-hero-field="tagline">Tagline (above title)</label>
+                    <input type="text" id="stats-hero-tagline" class="stats-editor-input" data-stats-hero-field="tagline" placeholder="e.g. // TOURNAMENT STATS" />
+                    <label class="stats-edit-label" data-stats-hero-field="title">Title</label>
+                    <input type="text" id="stats-hero-title" class="stats-editor-input" data-stats-hero-field="title" placeholder="e.g. MOTION" />
+                    <label class="stats-edit-label" data-stats-hero-field="subtitle">Subtitle (text under the title)</label>
+                    <input type="text" id="stats-hero-subtitle" class="stats-editor-input" data-stats-hero-field="subtitle" placeholder="Official tournament stats and Motion Rating™ leaderboards." />
+                    <label class="stats-edit-label" data-stats-hero-field="season">Season label</label>
+                    <input type="text" id="stats-hero-season" class="stats-editor-input" data-stats-hero-field="season" placeholder="e.g. SEASON 1 ACTIVE" />
+                    <label class="stats-edit-label" data-stats-hero-field="formats">Formats label</label>
+                    <input type="text" id="stats-hero-formats" class="stats-editor-input" data-stats-hero-field="formats" placeholder="e.g. 2V2 · 3V3 · 4V4" />
+                    <label class="stats-edit-label" data-stats-hero-field="game">Game label</label>
+                    <input type="text" id="stats-hero-game" class="stats-editor-input" data-stats-hero-field="game" placeholder="e.g. ROCKET LEAGUE" />
+                    <label class="stats-edit-label" data-stats-hero-field="open">Open label</label>
+                    <input type="text" id="stats-hero-open" class="stats-editor-input" data-stats-hero-field="open" placeholder="e.g. OPEN TO ALL RANKS" />
                   </div>
-                  <div class="stats-edit-section">
+                  <div class="stats-edit-section" data-stats-section="upcoming">
                     <span class="stats-easy-block-title">Upcoming section</span>
                     <label class="stats-edit-label">Section title</label>
                     <input type="text" id="stats-upcoming-title" class="stats-editor-input" placeholder="e.g. Upcoming" />
                     <label class="stats-edit-label">Body text</label>
                     <textarea id="stats-upcoming-body" class="stats-editor-textarea" spellcheck="false" placeholder="Next tournament TBD. Check Discord for dates and registration." rows="5"></textarea>
                   </div>
-                  <div class="stats-edit-section">
+                  <div class="stats-edit-section" data-stats-section="highlights">
                     <span class="stats-easy-block-title">Tournament highlights</span>
                     <label class="stats-edit-label">Section title</label>
                     <input type="text" id="stats-highlights-title" class="stats-editor-input" placeholder="e.g. Tournament highlights" />
                     <label class="stats-edit-label">Body text (fills the area below the current tournament)</label>
                     <textarea id="stats-highlights-body" class="stats-editor-textarea" spellcheck="false" placeholder="Key stats and standings. Bracket and leaderboard data are updated automatically on the live site." rows="4"></textarea>
                   </div>
-                  <div class="stats-edit-section">
+                  <div class="stats-edit-section" data-stats-section="leaderboards">
                     <span class="stats-easy-block-title">Leaderboards section</span>
                     <label class="stats-edit-label">Section title</label>
                     <input type="text" id="stats-leaderboards-title" class="stats-editor-input" placeholder="e.g. Motion Rating™ Leaderboard" />
                     <label class="stats-edit-label">Description (above the table)</label>
                     <textarea id="stats-leaderboards-description" class="stats-editor-textarea" spellcheck="false" placeholder="Season standings. The table below is updated automatically." rows="2"></textarea>
                   </div>
-                  <div class="stats-edit-section">
+                  <div class="stats-edit-section" data-stats-section="footer">
                     <span class="stats-easy-block-title">Footer</span>
                     <label class="stats-edit-label">Footer text</label>
                     <textarea id="stats-footer-text" class="stats-editor-textarea" spellcheck="false" placeholder="© Motion · Join Discord for updates. Stats subject to change." rows="3"></textarea>
@@ -261,11 +284,11 @@
             <nav class="tournament-subnav">
               <button type="button" class="tournament-subnav-item active" data-tournament-sub="registrations">Registrations</button>
               <button type="button" class="tournament-subnav-item" data-tournament-sub="players">Players DB</button>
-              <button type="button" class="tournament-subnav-item" data-tournament-sub="bracket" data-change-section="tournament-bracket">Bracket</button>
-              <button type="button" class="tournament-subnav-item" data-tournament-sub="results" data-change-section="tournament-results">Match results</button>
-              <button type="button" class="tournament-subnav-item" data-tournament-sub="schedule" data-change-section="tournament-schedule">Schedule</button>
-              <button type="button" class="tournament-subnav-item" data-tournament-sub="draft">Draft board</button>
               <button type="button" class="tournament-subnav-item" data-tournament-sub="teams">Teams</button>
+              <button type="button" class="tournament-subnav-item" data-tournament-sub="bracket" data-change-section="tournament-bracket">Bracket</button>
+              <button type="button" class="tournament-subnav-item" data-tournament-sub="draft">Draft board</button>
+              <button type="button" class="tournament-subnav-item" data-tournament-sub="schedule" data-change-section="tournament-schedule">Schedule</button>
+              <button type="button" class="tournament-subnav-item" data-tournament-sub="results" data-change-section="tournament-results">Match results</button>
               <button type="button" class="tournament-subnav-item" data-tournament-sub="archive">Archive</button>
               <button type="button" class="tournament-subnav-item" data-tournament-sub="settings">Settings</button>
             </nav>
@@ -277,7 +300,9 @@
                     <select id="tournament-select" class="tournament-select"></select>
                   </label>
                   <button type="button" class="secondary" id="tournament-new-btn">+ New</button>
+                  <button type="button" class="secondary" id="tournament-verify-sync-btn" title="Test that draft/bracket updates reach the sync server (for other hubs)">Verify sync</button>
                   <span class="master-only"><button type="button" class="secondary" id="tournament-archive-btn">Archive</button></span>
+                  <span id="tournament-verify-sync-status" class="status"></span>
                 </div>
               </header>
               <div id="tournament-registrations-pane" class="tournament-pane visible">
@@ -428,6 +453,7 @@
                 <div class="tournament-toolbar">
                   <button type="button" class="secondary" id="tournament-results-refresh-btn">Refresh</button>
                   <button type="button" class="primary" id="tournament-results-add-replay-btn">Select .replay files</button>
+                  <button type="button" class="secondary" id="tournament-results-add-manual-btn">Add result manually</button>
                   <span id="tournament-results-status" class="status"></span>
                 </div>
                 <div id="tournament-results-replay-drop" class="tournament-replay-drop" role="button" tabindex="0">

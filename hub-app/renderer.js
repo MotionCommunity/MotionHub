@@ -461,6 +461,53 @@ function setupTournamentApp() {
     });
   }
 
+  const verifySyncBtn = document.getElementById('tournament-verify-sync-btn');
+  const verifySyncStatusEl = document.getElementById('tournament-verify-sync-status');
+  function setVerifySyncStatus(msg, isError) {
+    if (verifySyncStatusEl) {
+      verifySyncStatusEl.textContent = msg || '';
+      verifySyncStatusEl.style.color = isError ? '#f87171' : '';
+    }
+  }
+  if (verifySyncBtn) {
+    verifySyncBtn.addEventListener('click', async () => {
+      setVerifySyncStatus('Checking…');
+      try {
+        const fetchResult = await ipc.invoke('tournamentSync:fetch');
+        if (!fetchResult.ok) {
+          setVerifySyncStatus(fetchResult.error || 'Fetch failed', true);
+          return;
+        }
+        const data = fetchResult.data || {};
+        const lastUpdated = data.lastUpdated ? new Date(data.lastUpdated).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' }) : 'never';
+        let msg = `Sync reachable. Last updated: ${lastUpdated}.`;
+        const rc = data.recentChanges || {};
+        const parts = [];
+        if (rc['tournament-bracket'] && rc['tournament-bracket'].by) parts.push(`Bracket by ${rc['tournament-bracket'].by}`);
+        if (rc['tournament-results'] && rc['tournament-results'].by) parts.push(`Results by ${rc['tournament-results'].by}`);
+        if (rc['tournament-schedule'] && rc['tournament-schedule'].by) parts.push(`Schedule by ${rc['tournament-schedule'].by}`);
+        if (parts.length) msg += ' ' + parts.join('; ');
+        if (activeTournamentId) {
+          setVerifySyncStatus('Pushing your draft/bracket…');
+          await pushBracketConfigToSync();
+          const refetch = await ipc.invoke('tournamentSync:fetch');
+          if (refetch.ok && refetch.data) {
+            lastSyncData = refetch.data;
+            updateChangeIndicators(refetch.data.recentChanges || {});
+            const lu = refetch.data.lastUpdated ? new Date(refetch.data.lastUpdated).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' }) : '';
+            setVerifySyncStatus(`Read & write OK. Your update is live. Last updated: ${lu}. Other hubs will see the change indicator.`);
+          } else {
+            setVerifySyncStatus(msg + ' Push may have failed.', true);
+          }
+        } else {
+          setVerifySyncStatus(msg + ' Select a tournament and push a change to test write.');
+        }
+      } catch (e) {
+        setVerifySyncStatus(e.message || 'Verify failed', true);
+      }
+    });
+  }
+
   if (regSearchInput) {
     regSearchInput.addEventListener('input', () => {
       regSearch = regSearchInput.value || '';
@@ -614,7 +661,8 @@ function setupTournamentApp() {
               subs.forEach((p) => {
                 const li = document.createElement('li');
                 li.className = 'tournament-sub-item';
-                li.innerHTML = `<span>${escapeHtml(p.ign)}</span> <button type="button" class="secondary tournament-remove-team-sub-btn" data-team-name="${escapeHtml(name)}" data-player-id="${p.id}">Remove</button>`;
+                const sal = Number(p.salary) || 0;
+                li.innerHTML = `<span>${escapeHtml(p.ign)}</span> <span class="player-salary">$${sal}</span> <button type="button" class="secondary tournament-remove-team-sub-btn" data-team-name="${escapeHtml(name)}" data-player-id="${p.id}">Remove</button>`;
                 li.querySelector('.tournament-remove-team-sub-btn').addEventListener('click', async () => {
                   if (!(await ensureFormatUnlockedForTeamsAndPlayers())) return;
                   ipc.invoke('tournament:removeTeamSub', activeTournamentId, name, p.id).then(() => loadBracketPane());
@@ -652,7 +700,8 @@ function setupTournamentApp() {
         subs.forEach((p) => {
           const li = document.createElement('li');
           li.className = 'tournament-sub-item';
-          li.innerHTML = `<span>${escapeHtml(p.ign)}</span> <button type="button" class="secondary tournament-remove-sub-btn" data-player-id="${p.id}">Remove</button>`;
+          const sal = Number(p.salary) || 0;
+          li.innerHTML = `<span>${escapeHtml(p.ign)}</span> <span class="player-salary">$${sal}</span> <button type="button" class="secondary tournament-remove-sub-btn" data-player-id="${p.id}">Remove</button>`;
           li.querySelector('.tournament-remove-sub-btn').addEventListener('click', async () => {
             if (!(await ensureFormatUnlockedForTeamsAndPlayers())) return;
             ipc.invoke('tournament:removeSub', activeTournamentId, p.id).then(() => loadBracketPane());
@@ -675,6 +724,32 @@ function setupTournamentApp() {
   let draftSortKey = 'ign';
   let draftSortDir = 1;
   let draftAvailableList = [];
+
+  function parseDraftDropData(dataTransfer) {
+    if (!dataTransfer) return null;
+    let payload = { playerIds: [], source: 'available', sourceTeam: null };
+    try {
+      const text = dataTransfer.getData('text/plain');
+      if (text && text.startsWith('draft:')) {
+        const parsed = JSON.parse(text.slice(6));
+        if (parsed && Array.isArray(parsed.playerIds)) {
+          payload = { playerIds: parsed.playerIds, source: parsed.source || 'available', sourceTeam: parsed.sourceTeam || null };
+        }
+      } else if (text && /^\d+$/.test(text.trim())) {
+        const id = parseInt(text.trim(), 10);
+        if (!isNaN(id)) payload = { playerIds: [id], source: 'available', sourceTeam: null };
+      } else {
+        const raw = dataTransfer.getData('application/json');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && Array.isArray(parsed.playerIds)) {
+            payload = { playerIds: parsed.playerIds, source: parsed.source || 'available', sourceTeam: parsed.sourceTeam || null };
+          }
+        }
+      }
+    } catch (_) {}
+    return payload.playerIds.length ? payload : null;
+  }
 
   function renderDraftAvailableTable() {
     const tbody = document.getElementById('tournament-draft-available-tbody');
@@ -711,12 +786,11 @@ function setupTournamentApp() {
         const ids = window._draftSelectedPlayerIds.has(p.id)
           ? Array.from(window._draftSelectedPlayerIds)
           : [p.id];
-        e.dataTransfer.setData('application/json', JSON.stringify({
-          playerIds: ids,
-          source: 'available',
-          sourceTeam: null,
-        }));
-        e.dataTransfer.effectAllowed = 'copy';
+        const payload = { playerIds: ids, source: 'available', sourceTeam: null };
+        const str = JSON.stringify(payload);
+        e.dataTransfer.setData('application/json', str);
+        e.dataTransfer.setData('text/plain', 'draft:' + str);
+        e.dataTransfer.effectAllowed = 'move';
       });
       tbody.appendChild(tr);
     });
@@ -952,6 +1026,56 @@ function setupTournamentApp() {
     const boardEl = document.getElementById('tournament-draft-board');
     const availableTbody = document.getElementById('tournament-draft-available-tbody');
     if (!teamsListEl || !boardEl) return;
+
+    if (!boardEl._draftDropCaptureDone) {
+      boardEl._draftDropCaptureDone = true;
+      boardEl.addEventListener('dragenter', (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+      }, true);
+      boardEl.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        e.dataTransfer.dropEffect = 'move';
+        const zone = document.elementsFromPoint(e.clientX, e.clientY).find((el) => el.classList && el.classList.contains('draft-drop-zone'));
+        boardEl.querySelectorAll('.draft-drop-zone').forEach((z) => z.classList.toggle('drag-over', z === zone));
+      }, true);
+      boardEl.addEventListener('drop', async (e) => {
+        const zone = document.elementsFromPoint(e.clientX, e.clientY).find((el) => el.classList && el.classList.contains('draft-drop-zone'));
+        if (!zone) return;
+        e.preventDefault();
+        e.stopPropagation();
+        zone.classList.remove('drag-over');
+        const payload = parseDraftDropData(e.dataTransfer);
+        if (!payload) return;
+        if (!(await ensureFormatUnlockedForTeamsAndPlayers())) return;
+        const teamName = zone.dataset.dropTeam;
+        const dropType = zone.dataset.dropType;
+        const ids = payload.playerIds.filter((id) => id && !isNaN(id));
+        if (ids.length === 0) return;
+        const sameTeamSameType = payload.sourceTeam === teamName &&
+          ((payload.source === 'roster' && dropType === 'roster') || (payload.source === 'sub' && dropType === 'subs'));
+        if (sameTeamSameType) return;
+        for (const playerId of ids) {
+          if (payload.source === 'sub' && payload.sourceTeam) {
+            await ipc.invoke('tournament:removeTeamSub', activeTournamentId, payload.sourceTeam, playerId);
+          } else if (payload.source === 'roster' && payload.sourceTeam) {
+            await ipc.invoke('tournament:unassignPlayerFromTeam', playerId);
+          }
+        }
+        for (const playerId of ids) {
+          if (dropType === 'roster') {
+            await ipc.invoke('tournament:assignPlayerToTeam', activeTournamentId, playerId, teamName);
+          } else {
+            await ipc.invoke('tournament:addTeamSub', activeTournamentId, teamName, playerId);
+          }
+        }
+        ids.forEach((id) => window._draftSelectedPlayerIds.delete(id));
+        await pushBracketConfigToSync();
+        loadDraftPane();
+      }, true);
+    }
+
     loadDraftPresetSelect();
     ipc.invoke('tournament:get', activeTournamentId).then((t) => {
       if (!t) return;
@@ -971,7 +1095,9 @@ function setupTournamentApp() {
           byTeam[team].push(p);
         });
         const onTeamIds = new Set((rosterPlayers || []).filter((p) => p.draftedToTeam).map((p) => p.id));
-        draftAvailableList = (approved || []).filter((p) => !onTeamIds.has(p.id));
+        const subIds = new Set();
+        Object.values(teamSubsByTeam || {}).forEach((ids) => { (ids || []).forEach((id) => subIds.add(id)); });
+        draftAvailableList = (approved || []).filter((p) => !onTeamIds.has(p.id) && !subIds.has(p.id));
         const subPlayerMap = (allPlayers || []).reduce((acc, p) => { acc[p.id] = p; return acc; }, {});
 
         teamsListEl.innerHTML = '';
@@ -1062,7 +1188,8 @@ function setupTournamentApp() {
             li.className = 'tournament-draft-team-sub draft-draggable-player';
             li.draggable = true;
             li.dataset.playerId = String(p.id);
-            li.innerHTML = `<span>${escapeHtml(p.ign)}</span> <button type="button" class="secondary" data-draft-remove-sub data-draft-team="${escapeHtml(name)}" data-player-id="${p.id}">Remove</button>`;
+            const subSal = Number(p.salary) || 0;
+            li.innerHTML = `<span class="player-info">${escapeHtml(p.ign)}</span><span class="player-salary">$${subSal}</span> <button type="button" class="secondary" data-draft-remove-sub data-draft-team="${escapeHtml(name)}" data-player-id="${p.id}">Remove</button>`;
             li.addEventListener('dragstart', (e) => {
               e.dataTransfer.setData('application/json', JSON.stringify({
                 playerIds: [p.id],
@@ -1103,39 +1230,31 @@ function setupTournamentApp() {
           card.querySelectorAll('.draft-drop-zone').forEach((zone) => {
             const teamName = zone.dataset.dropTeam;
             const dropType = zone.dataset.dropType;
-            zone.addEventListener('dragover', (e) => {
+            zone.addEventListener('dragenter', (e) => {
               e.preventDefault();
               e.dataTransfer.dropEffect = 'move';
               zone.classList.add('drag-over');
             });
-            zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+            zone.addEventListener('dragover', (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              e.dataTransfer.dropEffect = 'move';
+              zone.classList.add('drag-over');
+            });
+            zone.addEventListener('dragleave', (e) => {
+              if (!zone.contains(e.relatedTarget)) zone.classList.remove('drag-over');
+            });
             zone.addEventListener('drop', async (e) => {
               e.preventDefault();
+              e.stopPropagation();
               zone.classList.remove('drag-over');
+              const payload = parseDraftDropData(e.dataTransfer);
+              if (!payload) return;
               if (!(await ensureFormatUnlockedForTeamsAndPlayers())) return;
-              let payload = { playerIds: [], source: 'available', sourceTeam: null };
-              try {
-                const raw = e.dataTransfer.getData('application/json');
-                if (raw) {
-                  const parsed = JSON.parse(raw);
-                  if (parsed && Array.isArray(parsed.playerIds)) {
-                    payload = {
-                      playerIds: parsed.playerIds,
-                      source: parsed.source || 'available',
-                      sourceTeam: parsed.sourceTeam || null,
-                    };
-                  } else {
-                    payload = { playerIds: [].concat(parsed), source: 'available', sourceTeam: null };
-                  }
-                } else {
-                  const id = parseInt(e.dataTransfer.getData('text/plain'), 10);
-                  if (!isNaN(id)) payload = { playerIds: [id], source: 'available', sourceTeam: null };
-                }
-              } catch (_) {}
               const ids = payload.playerIds.filter((id) => id && !isNaN(id));
               if (ids.length === 0) return;
               const sameTeamSameType = payload.sourceTeam === teamName &&
-                ((payload.source === 'roster' && dropType === 'roster') || (payload.source === 'sub' && dropType === 'sub'));
+                ((payload.source === 'roster' && dropType === 'roster') || (payload.source === 'sub' && (dropType === 'sub' || dropType === 'subs')));
               if (sameTeamSameType) return;
               for (const playerId of ids) {
                 if (payload.source === 'sub' && payload.sourceTeam) {
@@ -1167,10 +1286,15 @@ function setupTournamentApp() {
     if (!(await ensureFormatUnlockedForTeamsAndPlayers())) return;
     window._draftAddPlayerTeamName = teamName;
     document.getElementById('tournament-draft-add-player-team-name').textContent = teamName || 'Team';
-    ipc.invoke('players:getAll', { status: 'Approved' }).then((approved) => {
-      ipc.invoke('players:getAll', { status: null, tournamentId: activeTournamentId }).then((drafted) => {
+    Promise.all([
+      ipc.invoke('players:getAll', { status: 'Approved' }),
+      ipc.invoke('players:getAll', { status: null, tournamentId: activeTournamentId }),
+      ipc.invoke('tournament:getAllTeamSubsByTeam', activeTournamentId),
+    ]).then(([approved, drafted, teamSubsByTeam]) => {
         const onTeam = new Set((drafted || []).filter((p) => p.draftedToTeam).map((p) => p.id));
-        const available = (approved || []).filter((p) => !onTeam.has(p.id));
+        const subSet = new Set();
+        Object.values(teamSubsByTeam || {}).forEach((ids) => { (ids || []).forEach((id) => subSet.add(id)); });
+        const available = (approved || []).filter((p) => !onTeam.has(p.id) && !subSet.has(p.id));
         const selectEl = document.getElementById('tournament-draft-add-player-select');
         if (!selectEl) return;
         selectEl.innerHTML = '';
@@ -1181,7 +1305,6 @@ function setupTournamentApp() {
           selectEl.appendChild(opt);
         });
         selectEl.value = available[0]?.id ?? '';
-      });
     });
     document.getElementById('tournament-draft-add-player-modal').hidden = false;
   }
@@ -1356,7 +1479,8 @@ function setupTournamentApp() {
       } catch (_) { /* skip failed */ }
     }
     if (parsedList.length === 0) {
-      if (window.toast) window.toast('Could not parse any .replay files.');
+      if (window.toast) window.toast('Could not parse .replay files (parser missing?). Opening form so you can enter the result manually.');
+      openResultOverrideModal(null, null);
       return;
     }
     const last = extractReplayMatchInfo(parsedList[parsedList.length - 1]);
@@ -1389,7 +1513,7 @@ function setupTournamentApp() {
     const noteInput = document.getElementById('tournament-result-override-note');
     if (!modal || !idInput) return;
     const isNew = !m || !m.id;
-    if (titleEl) titleEl.textContent = isNew ? 'Add match result from replay' : 'Override / adjust result';
+    if (titleEl) titleEl.textContent = isNew ? (replayPrefill ? 'Add match result from replay' : 'Add match result (manual)') : 'Override / adjust result';
     if (newFieldsWrap) newFieldsWrap.style.display = isNew ? 'block' : 'none';
     idInput.value = (m && m.id) || '';
     if (roundInput) roundInput.value = (m && m.round) || '';
@@ -1423,6 +1547,17 @@ function setupTournamentApp() {
     const roundInput = document.getElementById('tournament-result-override-round');
     const slotInput = document.getElementById('tournament-result-override-slot');
     const matchId = (idInput?.value || '').trim();
+    const isNewResult = !matchId;
+    if (isNewResult && (!lastSyncData || !Array.isArray(lastSyncData.matchResults))) {
+      ipc.invoke('tournamentSync:fetch').then((result) => {
+        if (result.ok && result.data) {
+          lastSyncData = result.data;
+          if (!Array.isArray(lastSyncData.matchResults)) lastSyncData.matchResults = [];
+          saveResultOverride();
+        } else if (window.toast) window.toast('Could not load tournament data. Set Notes sync URL and try Refresh first.');
+      });
+      return;
+    }
     if (!lastSyncData || !Array.isArray(lastSyncData.matchResults)) return;
     const teamAInput = document.getElementById('tournament-result-override-team-a');
     const teamBInput = document.getElementById('tournament-result-override-team-b');
@@ -1465,7 +1600,12 @@ function setupTournamentApp() {
             document.getElementById('tournament-result-override-modal').hidden = true;
             lastSyncData = payload;
             loadMatchResults();
+            if (window.toast) window.toast('Result saved. It should appear in the list above.');
+          } else {
+            if (window.toast) window.toast(result.error || 'Could not save. Set Notes sync URL in Staff Notes and try again.');
           }
+        }).catch(() => {
+          if (window.toast) window.toast('Could not save. Check Notes sync URL and connection.');
         });
       });
       return;
@@ -1491,7 +1631,9 @@ function setupTournamentApp() {
           document.getElementById('tournament-result-override-modal').hidden = true;
           lastSyncData = payload;
           loadMatchResults();
-        }
+        } else if (window.toast) window.toast(result.error || 'Could not save.');
+      }).catch(() => {
+        if (window.toast) window.toast('Could not save. Check Notes sync URL and connection.');
       });
     });
   }
@@ -2295,6 +2437,12 @@ function setupTournamentApp() {
       await handleReplayFiles(paths || []);
     });
   }
+  const addManualBtn = document.getElementById('tournament-results-add-manual-btn');
+  if (addManualBtn) {
+    addManualBtn.addEventListener('click', () => {
+      if (typeof openResultOverrideModal === 'function') openResultOverrideModal(null, null);
+    });
+  }
   const replayDrop = document.getElementById('tournament-results-replay-drop');
   if (replayDrop) {
     replayDrop.addEventListener('dragover', (e) => { e.preventDefault(); replayDrop.classList.add('drag-over'); });
@@ -2575,12 +2723,24 @@ function setupRulesEditor() {
   function switchRulesTab(tab) {
     document.querySelectorAll('.rules-tab').forEach((b) => b.classList.toggle('active', b.dataset.rulesTab === tab));
     panePreview.classList.toggle('visible', tab === 'preview');
+    if (tab === 'preview') {
+      const previewIframe = document.getElementById('rules-preview-iframe');
+      if (previewIframe && previewIframe.src) {
+        const base = previewIframe.src.split('?')[0];
+        previewIframe.src = base + '?t=' + Date.now();
+      }
+    }
     if (paneEasy) {
       paneEasy.classList.toggle('visible', tab === 'easy');
-      if (tab === 'easy' && !_rulesState.model && RulesEditorAPI) {
-        _rulesState = { model: RulesEditorAPI.defaultModel(), fullHtml: '', replaceStart: 0, replaceEnd: 0, heroStart: null, heroEnd: null };
-        _rulesEasyDirty = false;
-        renderStructuredEditor(_rulesState.model);
+      if (tab === 'easy') {
+        if (typeof refreshSuggestionsList === 'function') refreshSuggestionsList();
+        if (!_rulesState.model && RulesEditorAPI) {
+          _rulesState = { model: RulesEditorAPI.defaultModel(), fullHtml: '', replaceStart: 0, replaceEnd: 0, heroStart: null, heroEnd: null };
+          _rulesEasyDirty = false;
+          renderStructuredEditor(_rulesState.model);
+        } else {
+          updatePreview();
+        }
       }
     }
     paneSource.classList.toggle('visible', tab === 'source');
@@ -2589,6 +2749,17 @@ function setupRulesEditor() {
   document.querySelectorAll('.rules-tab').forEach((btn) => {
     btn.addEventListener('click', () => switchRulesTab(btn.dataset.rulesTab));
   });
+
+  const rulesPreviewRefreshBtn = document.getElementById('rules-preview-refresh-btn');
+  if (rulesPreviewRefreshBtn) {
+    rulesPreviewRefreshBtn.addEventListener('click', () => {
+      const iframe = document.getElementById('rules-preview-iframe');
+      if (iframe && iframe.src) {
+        const base = iframe.src.split('?')[0];
+        iframe.src = base + '?t=' + Date.now();
+      }
+    });
+  }
 
   loadBtn.addEventListener('click', async () => {
     const ipc = getIpc();
@@ -2621,13 +2792,18 @@ function setupRulesEditor() {
     }
     setStatus('Publishing…');
     try {
+      let sha = currentSha;
+      if (!sha) {
+        const res = await ipc.invoke('github:getRulesFile');
+        sha = res.sha || null;
+      }
       await ipc.invoke('github:putRulesFile', {
         content,
         message: 'Update rules from Motion Hub',
-        sha: currentSha,
+        sha,
       });
-      const { sha } = await ipc.invoke('github:getRulesFile');
-      currentSha = sha;
+      const { sha: newSha } = await ipc.invoke('github:getRulesFile');
+      currentSha = newSha;
       setStatus('Published. Live site may take a minute to update.');
     } catch (err) {
       setStatus(err.message || 'Publish failed', true);
@@ -2651,7 +2827,8 @@ function setupRulesEditor() {
             try {
               const content = await ipc.invoke('github:getRulesFileAtRef', c.sha);
               editor.value = content;
-              currentSha = null;
+              const { sha } = await ipc.invoke('github:getRulesFile');
+              currentSha = sha;
               setStatus('Loaded that version. Click Publish to make it live.');
               closeRollbackModal();
             } catch (e) {
@@ -2691,6 +2868,7 @@ function setupRulesEditor() {
   // —— Easy Edit: structured rules editor (form-like, drag, add/delete, bold+red+green, staff images) ———
   let _rulesState = { model: null, fullHtml: '', replaceStart: 0, replaceEnd: 0, heroStart: null, heroEnd: null };
   let _rulesEasyDirty = false;
+  let _rulesEasySha = null;
   const RulesEditorAPI = typeof RulesEditor !== 'undefined' ? RulesEditor : null;
   let _previewDebounceTimer = null;
   const PREVIEW_DEBOUNCE_MS = 300;
@@ -3116,6 +3294,75 @@ function setupRulesEditor() {
   const easySubmitBtn = document.getElementById('rules-easy-submit-btn');
   const easyPublishBtn = document.getElementById('rules-easy-publish-btn');
   const easyLoadSuggestedBtn = document.getElementById('rules-easy-load-suggested-btn');
+  const suggestionsDropdown = document.getElementById('rules-suggestions-dropdown');
+  const refreshSuggestionsBtn = document.getElementById('rules-easy-refresh-suggestions-btn');
+  const diffBtn = document.getElementById('rules-easy-diff-btn');
+  const diffModal = document.getElementById('rules-diff-modal');
+  const diffBody = document.getElementById('rules-diff-body');
+  const diffCloseBtn = document.getElementById('rules-diff-close');
+
+  let _suggestionsItems = [];
+
+  function formatSuggestionLabel(item) {
+    if (!item) return '';
+    const d = item.submittedAt ? new Date(item.submittedAt) : null;
+    const dateStr = d ? d.toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' }) : 'Unknown date';
+    return item.submittedBy ? `${dateStr} – ${item.submittedBy}` : dateStr;
+  }
+
+  async function refreshSuggestionsList() {
+    const ipc = getIpc();
+    if (!ipc) return;
+    const result = await ipc.invoke('notes:fetchSuggestedRules');
+    if (!result.ok || !Array.isArray(result.items)) {
+      _suggestionsItems = [];
+      if (suggestionsDropdown) {
+        suggestionsDropdown.innerHTML = '<option value="">— Staff suggestions —</option>';
+      }
+      return;
+    }
+    _suggestionsItems = result.items;
+    if (suggestionsDropdown) {
+      suggestionsDropdown.innerHTML = '<option value="">— Staff suggestions —</option>';
+      _suggestionsItems.forEach((item) => {
+        const opt = document.createElement('option');
+        opt.value = item.id || '';
+        opt.textContent = formatSuggestionLabel(item);
+        suggestionsDropdown.appendChild(opt);
+      });
+    }
+  }
+
+  function simpleLineDiff(liveHtml, suggestedHtml) {
+    const a = (liveHtml || '').split(/\r?\n/);
+    const b = (suggestedHtml || '').split(/\r?\n/);
+    const out = [];
+    const n = a.length;
+    const m = b.length;
+    const dp = Array(n + 1).fill(null).map(() => Array(m + 1).fill(0));
+    for (let i = 1; i <= n; i++) {
+      for (let j = 1; j <= m; j++) {
+        if (a[i - 1] === b[j - 1]) dp[i][j] = dp[i - 1][j - 1] + 1;
+        else dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+      }
+    }
+    let i = n, j = m;
+    const seq = [];
+    while (i > 0 || j > 0) {
+      if (i > 0 && j > 0 && a[i - 1] === b[j - 1]) {
+        seq.push({ type: 'common', line: a[i - 1] });
+        i--; j--;
+      } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
+        seq.push({ type: 'add', line: b[j - 1] });
+        j--;
+      } else {
+        seq.push({ type: 'remove', line: a[i - 1] });
+        i--;
+      }
+    }
+    seq.reverse();
+    return seq;
+  }
 
   if (easyLoadBtn) {
     easyLoadBtn.addEventListener('click', async () => {
@@ -3127,7 +3374,8 @@ function setupRulesEditor() {
       if (!confirm(message)) return;
       setEasyStatus('Loading…');
       try {
-        const { content } = await ipc.invoke('github:getRulesFile');
+        const { content, sha } = await ipc.invoke('github:getRulesFile');
+        _rulesEasySha = sha || null;
         const parsed = RulesEditorAPI ? RulesEditorAPI.parseRulesHtml(content) : { model: null, fullHtml: content, replaceStart: 0, replaceEnd: content.length, heroStart: null, heroEnd: null };
         _rulesState = { model: parsed.model || RulesEditorAPI.defaultModel(), fullHtml: parsed.fullHtml || content, replaceStart: parsed.replaceStart ?? 0, replaceEnd: parsed.replaceEnd ?? content.length, heroStart: parsed.heroStart ?? null, heroEnd: parsed.heroEnd ?? null };
         _rulesEasyDirty = false;
@@ -3139,6 +3387,21 @@ function setupRulesEditor() {
     });
   }
 
+  function autoLoadRulesFromGitHub() {
+    const ipc = getIpc();
+    if (!ipc || !RulesEditorAPI) return;
+    ipc.invoke('github:getRulesFile').then(({ content, sha }) => {
+      if (!content) return;
+      const parsed = RulesEditorAPI.parseRulesHtml(content);
+      _rulesState = { model: parsed.model || RulesEditorAPI.defaultModel(), fullHtml: parsed.fullHtml || content, replaceStart: parsed.replaceStart ?? 0, replaceEnd: parsed.replaceEnd ?? content.length, heroStart: parsed.heroStart ?? null, heroEnd: parsed.heroEnd ?? null };
+      _rulesEasySha = sha || null;
+      _rulesEasyDirty = false;
+      renderStructuredEditor(_rulesState.model);
+      const sourceEl = document.getElementById('rules-source-editor');
+      if (sourceEl) sourceEl.value = content;
+    }).catch(() => {});
+  }
+
   if (easySubmitBtn) {
     easySubmitBtn.addEventListener('click', async () => {
       const ipc = getIpc();
@@ -3148,7 +3411,8 @@ function setupRulesEditor() {
       const html = RulesEditorAPI ? RulesEditorAPI.renderRulesHtml(model, _rulesState.fullHtml, _rulesState.replaceStart, _rulesState.replaceEnd, _rulesState.heroStart, _rulesState.heroEnd) : '';
       if (!html) return setEasyStatus('Could not build HTML.', true);
       setEasyStatus('Submitting…');
-      const result = await ipc.invoke('notes:submitSuggestedRules', html);
+      const submittedBy = await ipc.invoke('app:getStaffHandle').catch(() => '');
+      const result = await ipc.invoke('notes:submitSuggestedRules', { html, submittedBy: (submittedBy && String(submittedBy).trim()) || '' });
       if (result.ok) _rulesEasyDirty = false;
       setEasyStatus(result.ok ? 'Suggested changes submitted. Master can review and publish.' : (result.error || 'Submit failed'), !result.ok);
     });
@@ -3160,12 +3424,21 @@ function setupRulesEditor() {
       if (!ipc) return setEasyStatus('Not available.', true);
       const model = collectModelFromEditor() || _rulesState.model;
       if (!model) return setEasyStatus('Nothing to publish. Add or load content first.', true);
-      const html = RulesEditorAPI ? RulesEditorAPI.renderRulesHtml(model, _rulesState.fullHtml, _rulesState.replaceStart, _rulesState.replaceEnd, _rulesState.heroStart, _rulesState.heroEnd) : '';
+      const html = RulesEditorAPI && RulesEditorAPI.patchRulesIntoOriginalHtml
+        ? RulesEditorAPI.patchRulesIntoOriginalHtml(model, _rulesState.fullHtml, _rulesState.replaceStart, _rulesState.replaceEnd, _rulesState.heroStart, _rulesState.heroEnd)
+        : (RulesEditorAPI ? RulesEditorAPI.renderRulesHtml(model, _rulesState.fullHtml, _rulesState.replaceStart, _rulesState.replaceEnd, _rulesState.heroStart, _rulesState.heroEnd) : '');
       if (!html) return setEasyStatus('Could not build HTML.', true);
       setEasyStatus('Publishing…');
       try {
-        await ipc.invoke('github:putRulesFile', { content: html, message: 'Update rules from Motion Hub (Easy Edit)' });
+        let sha = _rulesEasySha;
+        if (!sha) {
+          const { sha: currentSha } = await ipc.invoke('github:getRulesFile');
+          sha = currentSha;
+        }
+        await ipc.invoke('github:putRulesFile', { content: html, message: 'Update rules from Motion Hub (Easy Edit)', sha });
         _rulesEasyDirty = false;
+        const { sha: newSha } = await ipc.invoke('github:getRulesFile');
+        _rulesEasySha = newSha || null;
         setEasyStatus('Published. Live site may take a minute to update.');
       } catch (e) {
         setEasyStatus(e.message || 'Publish failed', true);
@@ -3178,16 +3451,77 @@ function setupRulesEditor() {
       const ipc = getIpc();
       if (!ipc) return setEasyStatus('Not available.', true);
       if (_rulesEasyDirty && !confirm('You have unsaved changes. Load staff suggestion anyway? This will replace your current edits.')) return;
+      const selectedId = suggestionsDropdown && suggestionsDropdown.value;
+      let html = null;
+      if (selectedId && _suggestionsItems.length) {
+        const item = _suggestionsItems.find((s) => s.id === selectedId);
+        if (item) html = item.html;
+      }
+      if (!html) {
+        setEasyStatus('Refreshing list…');
+        await refreshSuggestionsList();
+        if (_suggestionsItems.length) {
+          html = _suggestionsItems[0].html;
+          if (suggestionsDropdown) suggestionsDropdown.value = _suggestionsItems[0].id || '';
+        }
+      }
+      if (!html) return setEasyStatus('No suggestion selected. Pick one from the dropdown or refresh the list.', true);
       setEasyStatus('Loading staff suggestion…');
-      const result = await ipc.invoke('notes:fetchSuggestedRules');
-      if (!result.ok) return setEasyStatus(result.error || 'Load failed', true);
-      if (!result.html) return setEasyStatus('No suggested rules from staff yet.', true);
-      const parsed = RulesEditorAPI ? RulesEditorAPI.parseRulesHtml(result.html) : { model: RulesEditorAPI.defaultModel(), fullHtml: result.html, replaceStart: 0, replaceEnd: result.html.length, heroStart: null, heroEnd: null };
-      _rulesState = { model: parsed.model, fullHtml: parsed.fullHtml, replaceStart: parsed.replaceStart ?? 0, replaceEnd: parsed.replaceEnd ?? result.html.length, heroStart: parsed.heroStart ?? null, heroEnd: parsed.heroEnd ?? null };
+      const parsed = RulesEditorAPI ? RulesEditorAPI.parseRulesHtml(html) : { model: RulesEditorAPI.defaultModel(), fullHtml: html, replaceStart: 0, replaceEnd: html.length, heroStart: null, heroEnd: null };
+      _rulesState = { model: parsed.model, fullHtml: parsed.fullHtml, replaceStart: parsed.replaceStart ?? 0, replaceEnd: parsed.replaceEnd ?? html.length, heroStart: parsed.heroStart ?? null, heroEnd: parsed.heroEnd ?? null };
       _rulesEasyDirty = false;
       renderStructuredEditor(_rulesState.model);
       setEasyStatus('Loaded staff suggestion. Review and click Publish to make it live.');
     });
+  }
+
+  if (refreshSuggestionsBtn) {
+    refreshSuggestionsBtn.addEventListener('click', async () => {
+      setEasyStatus('Refreshing suggestions…');
+      await refreshSuggestionsList();
+      setEasyStatus(_suggestionsItems.length ? `Loaded ${_suggestionsItems.length} suggestion(s). Pick one and click Load selected.` : 'No staff suggestions yet.');
+    });
+  }
+
+  if (diffBtn) {
+    diffBtn.addEventListener('click', async () => {
+      const ipc = getIpc();
+      if (!ipc) return setEasyStatus('Not available.', true);
+      let suggestedHtml = null;
+      const selectedId = suggestionsDropdown && suggestionsDropdown.value;
+      if (selectedId && _suggestionsItems.length) {
+        const item = _suggestionsItems.find((s) => s.id === selectedId);
+        if (item) suggestedHtml = item.html;
+      }
+      if (!suggestedHtml && _rulesState.fullHtml) suggestedHtml = RulesEditorAPI ? RulesEditorAPI.renderRulesHtml(collectModelFromEditor() || _rulesState.model, _rulesState.fullHtml, _rulesState.replaceStart, _rulesState.replaceEnd, _rulesState.heroStart, _rulesState.heroEnd) : _rulesState.fullHtml;
+      if (!suggestedHtml) return setEasyStatus('Load a suggestion first or select one from the dropdown.', true);
+      setEasyStatus('Loading live rules for comparison…');
+      try {
+        const { content: liveHtml } = await ipc.invoke('github:getRulesFile');
+        const seq = simpleLineDiff(liveHtml || '', suggestedHtml);
+        if (!diffBody) return;
+        diffBody.innerHTML = '';
+        seq.forEach(({ type, line }) => {
+          const div = document.createElement('div');
+          div.className = 'diff-line diff-' + (type === 'add' ? 'add' : type === 'remove' ? 'remove' : 'common');
+          div.textContent = (type === 'add' ? '+ ' : type === 'remove' ? '- ' : '  ') + (line || '');
+          diffBody.appendChild(div);
+        });
+        if (diffModal) {
+          diffModal.hidden = false;
+        }
+        setEasyStatus('');
+      } catch (e) {
+        setEasyStatus(e.message || 'Failed to load live rules.', true);
+      }
+    });
+  }
+
+  if (diffCloseBtn && diffModal) {
+    diffCloseBtn.addEventListener('click', () => { diffModal.hidden = true; });
+  }
+  if (diffModal) {
+    diffModal.addEventListener('click', (e) => { if (e.target === diffModal) diffModal.hidden = true; });
   }
 
   const tokenInput = document.getElementById('rules-token-input');
@@ -3209,6 +3543,7 @@ function setupRulesEditor() {
     }
   }
 
+  autoLoadRulesFromGitHub();
   function escapeHtml(s) {
     const div = document.createElement('div');
     div.textContent = s;
@@ -3358,12 +3693,59 @@ function setupStatsEditor() {
   let statsSha = null;
   let statsParsed = null;
   let _statsPreviewDebounce = null;
-  const STATS_PREVIEW_DEBOUNCE_MS = 400;
+  const STATS_PREVIEW_DEBOUNCE_MS = 200;
 
   function setStatus(msg, isError) {
     if (!statusEl) return;
     statusEl.textContent = msg || '';
     statusEl.style.color = isError ? '#f87171' : '';
+  }
+
+  /** Show only Easy Edit sections that exist in the loaded stats HTML. */
+  function updateStatsEditorSectionVisibility(parsed) {
+    const hint = document.getElementById('stats-easy-load-hint');
+    const sectionsContainer = document.getElementById('stats-easy-sections');
+    if (!sectionsContainer) return;
+    const sections = sectionsContainer.querySelectorAll('.stats-edit-section[data-stats-section]');
+    const has = (name) => {
+      if (!parsed) return false;
+      if (name === 'hero') return parsed.heroStart >= 0 && parsed.heroEnd > parsed.heroStart;
+      if (name === 'upcoming') return parsed.upcomingStart >= 0 && parsed.upcomingEnd > parsed.upcomingStart;
+      if (name === 'highlights') return parsed.highlightsStart >= 0 && parsed.highlightsEnd > parsed.highlightsStart;
+      if (name === 'leaderboards') return parsed.leaderboardsStart >= 0 && parsed.leaderboardsEnd > parsed.leaderboardsStart;
+      if (name === 'footer') return parsed.footerStart >= 0 && parsed.footerEnd > parsed.footerStart;
+      return false;
+    };
+    if (!parsed || (parsed.heroStart < 0 && parsed.upcomingStart < 0 && parsed.highlightsStart < 0 && parsed.leaderboardsStart < 0 && parsed.footerStart < 0)) {
+      if (hint) hint.style.display = '';
+      sections.forEach((el) => { el.style.display = 'none'; });
+      return;
+    }
+    if (hint) hint.style.display = 'none';
+    sections.forEach((el) => {
+      const name = el.getAttribute('data-stats-section');
+      el.style.display = has(name) ? '' : 'none';
+    });
+    // Within hero section, show only fields that exist in the loaded HTML
+    const heroSection = sectionsContainer.querySelector('.stats-edit-section[data-stats-section="hero"]');
+    if (heroSection && parsed && has('hero') && typeof StatsEditorAPI !== 'undefined' && StatsEditorAPI.getHeroShape && parsed.hero) {
+      const shape = StatsEditorAPI.getHeroShape(parsed.hero);
+      const badgeOrder = ['season', 'formats', 'game', 'open'];
+      heroSection.querySelectorAll('[data-stats-hero-field]').forEach((el) => {
+        const field = el.getAttribute('data-stats-hero-field');
+        let show = true;
+        if (field === 'tagline') show = shape.hasTagline;
+        else if (field === 'title') show = shape.hasTitle;
+        else if (field === 'subtitle') show = shape.hasSubtitle;
+        else if (badgeOrder.includes(field)) show = badgeOrder.indexOf(field) < shape.badgeCount;
+        el.style.display = show ? '' : 'none';
+      });
+    } else if (heroSection) {
+      heroSection.querySelectorAll('[data-stats-hero-field]').forEach((el) => { el.style.display = ''; });
+    }
+    if (parsed && (has('hero') || has('upcoming') || has('highlights') || has('leaderboards') || has('footer'))) {
+      debouncedUpdateStatsPreview();
+    }
   }
 
   function collectStatsModelFromEditor() {
@@ -3492,11 +3874,29 @@ function setupStatsEditor() {
     });
   }
 
+  const statsPreviewRefreshBtn = document.getElementById('stats-preview-refresh-btn');
+  if (statsPreviewRefreshBtn) {
+    statsPreviewRefreshBtn.addEventListener('click', () => {
+      const iframe = document.getElementById('stats-preview-iframe');
+      if (iframe && iframe.src) {
+        const base = iframe.src.split('?')[0];
+        iframe.src = base + '?t=' + Date.now();
+      }
+    });
+  }
+
   document.querySelectorAll('.stats-tab').forEach((btn) => {
     btn.addEventListener('click', () => {
       const tab = btn.dataset.statsTab;
       document.querySelectorAll('.stats-tab').forEach((b) => b.classList.toggle('active', b.dataset.statsTab === tab));
       if (panePreview) panePreview.classList.toggle('visible', tab === 'preview');
+      if (tab === 'preview') {
+        const previewIframe = document.getElementById('stats-preview-iframe');
+        if (previewIframe && previewIframe.src) {
+          const base = previewIframe.src.split('?')[0];
+          previewIframe.src = base + '?t=' + Date.now();
+        }
+      }
       if (paneEdit) paneEdit.classList.toggle('visible', tab === 'edit');
       if (paneSource) paneSource.classList.toggle('visible', tab === 'source');
       if (tab === 'edit') {
@@ -3507,6 +3907,7 @@ function setupStatsEditor() {
 
   // Show minimal preview as soon as Easy Edit is available (no GitHub load required)
   updateStatsPreview();
+  updateStatsEditorSectionVisibility(statsParsed);
 
   if (insertMarkersBtn) {
     insertMarkersBtn.addEventListener('click', () => {
@@ -3541,6 +3942,7 @@ function setupStatsEditor() {
       statsFullContent = newContent;
       statsParsed = parseStatsEditableRegions(newContent);
       setStatus('Markers inserted. Click Publish to save to GitHub.');
+      updateStatsEditorSectionVisibility(statsParsed);
       updateStatsPreview();
     });
   }
@@ -3556,6 +3958,7 @@ function setupStatsEditor() {
         statsFullContent = content;
         statsSha = sha;
         statsParsed = parseStatsEditableRegions(content);
+        updateStatsEditorSectionVisibility(statsParsed);
         const model = (typeof StatsEditorAPI !== 'undefined' && StatsEditorAPI.parseStatsFromRegions)
           ? StatsEditorAPI.parseStatsFromRegions(statsParsed.hero || '', statsParsed.upcoming || '', statsParsed.highlights || '', statsParsed.leaderboards || '', statsParsed.footer || '')
           : (StatsEditorAPI && StatsEditorAPI.defaultStatsModel ? StatsEditorAPI.defaultStatsModel() : null);
@@ -3570,6 +3973,7 @@ function setupStatsEditor() {
         setStatus(err.message || 'Load failed', true);
         statsSha = null;
         statsParsed = null;
+        updateStatsEditorSectionVisibility(null);
       }
     });
   }
@@ -3609,6 +4013,7 @@ function setupStatsEditor() {
         if (!result.ok || !result.html) return setStatus(result.error || 'No suggestion found.', true);
         statsFullContent = result.html;
         statsParsed = parseStatsEditableRegions(result.html);
+        updateStatsEditorSectionVisibility(statsParsed);
         const model = (typeof StatsEditorAPI !== 'undefined' && StatsEditorAPI.parseStatsFromRegions)
           ? StatsEditorAPI.parseStatsFromRegions(statsParsed.hero || '', statsParsed.upcoming || '', statsParsed.highlights || '', statsParsed.leaderboards || '', statsParsed.footer || '')
           : (StatsEditorAPI && StatsEditorAPI.defaultStatsModel ? StatsEditorAPI.defaultStatsModel() : null);
@@ -3636,11 +4041,22 @@ function setupStatsEditor() {
       setStatus('Publishing…');
       try {
         const model = collectStatsModelFromEditor();
-        const heroHtml = StatsEditorAPI.renderStatsHero(model.hero);
-        const upcomingHtml = StatsEditorAPI.renderStatsUpcoming(model.upcoming);
-        const highlightsHtml = (StatsEditorAPI.renderStatsHighlights && model.highlights) ? StatsEditorAPI.renderStatsHighlights(model.highlights) : null;
-        const leaderboardsHtml = (StatsEditorAPI.renderStatsLeaderboards && model.leaderboards) ? StatsEditorAPI.renderStatsLeaderboards(model.leaderboards) : null;
-        const footerHtml = (StatsEditorAPI.renderStatsFooter && model.footer) ? StatsEditorAPI.renderStatsFooter(model.footer) : null;
+        // Patch model into original region HTML so published page keeps current format
+        const heroHtml = (StatsEditorAPI.patchStatsHeroIntoOriginal && statsParsed.hero)
+          ? StatsEditorAPI.patchStatsHeroIntoOriginal(statsParsed.hero, model.hero)
+          : StatsEditorAPI.renderStatsHero(model.hero);
+        const upcomingHtml = (StatsEditorAPI.patchStatsUpcomingIntoOriginal && statsParsed.upcoming)
+          ? StatsEditorAPI.patchStatsUpcomingIntoOriginal(statsParsed.upcoming, model.upcoming)
+          : StatsEditorAPI.renderStatsUpcoming(model.upcoming);
+        const highlightsHtml = (StatsEditorAPI.patchStatsHighlightsIntoOriginal && statsParsed.highlights && model.highlights)
+          ? StatsEditorAPI.patchStatsHighlightsIntoOriginal(statsParsed.highlights, model.highlights)
+          : (StatsEditorAPI.renderStatsHighlights && model.highlights) ? StatsEditorAPI.renderStatsHighlights(model.highlights) : null;
+        const leaderboardsHtml = (StatsEditorAPI.patchStatsLeaderboardsIntoOriginal && statsParsed.leaderboards && model.leaderboards)
+          ? StatsEditorAPI.patchStatsLeaderboardsIntoOriginal(statsParsed.leaderboards, model.leaderboards)
+          : (StatsEditorAPI.renderStatsLeaderboards && model.leaderboards) ? StatsEditorAPI.renderStatsLeaderboards(model.leaderboards) : null;
+        const footerHtml = (StatsEditorAPI.patchStatsFooterIntoOriginal && statsParsed.footer && model.footer)
+          ? StatsEditorAPI.patchStatsFooterIntoOriginal(statsParsed.footer, model.footer)
+          : (StatsEditorAPI.renderStatsFooter && model.footer) ? StatsEditorAPI.renderStatsFooter(model.footer) : null;
         const newContent = buildStatsContentFromEdits(statsFullContent, heroHtml, upcomingHtml, highlightsHtml, leaderboardsHtml, footerHtml, statsParsed);
         await ipc.invoke('github:putStatsFile', {
           content: newContent,
@@ -3651,6 +4067,7 @@ function setupStatsEditor() {
         statsSha = sha;
         statsFullContent = newContent;
         statsParsed = parseStatsEditableRegions(newContent);
+        updateStatsEditorSectionVisibility(statsParsed);
         setStatus('Published. Live site may take a minute to update.');
         updateStatsPreview();
       } catch (err) {
@@ -3721,11 +4138,38 @@ function setupStatsEditor() {
       }).catch(() => setSourceStatus('Failed to save token.', true));
     });
   }
+
+  function autoLoadStatsFromGitHub() {
+    const ipc = getIpc();
+    if (!ipc) return;
+    ipc.invoke('github:getStatsFile').then(({ content, sha }) => {
+      if (!content) return;
+      statsFullContent = content;
+      statsSha = sha;
+      statsParsed = parseStatsEditableRegions(content);
+      updateStatsEditorSectionVisibility(statsParsed);
+      const model = (typeof StatsEditorAPI !== 'undefined' && StatsEditorAPI.parseStatsFromRegions)
+        ? StatsEditorAPI.parseStatsFromRegions(statsParsed.hero || '', statsParsed.upcoming || '', statsParsed.highlights || '', statsParsed.leaderboards || '', statsParsed.footer || '')
+        : (StatsEditorAPI && StatsEditorAPI.defaultStatsModel ? StatsEditorAPI.defaultStatsModel() : null);
+      if (model) fillStatsEditorFromModel(model);
+      updateStatsPreview();
+      if (statsSourceEditor) statsSourceEditor.value = content;
+      statsSourceSha = sha;
+    }).catch(() => {});
+  }
+  autoLoadStatsFromGitHub();
 }
 
 window.addEventListener('DOMContentLoaded', () => {
   if (window.MOTION_HUB_BUILD === 'master') {
     document.body.classList.add('is-master');
+    document.title = 'Motion Hub — Master';
+    const brandSub = document.getElementById('brand-subtitle');
+    if (brandSub) brandSub.textContent = 'Master Hub';
+    const homeHeadline = document.getElementById('home-headline');
+    if (homeHeadline) homeHeadline.textContent = 'Welcome to Motion Master Hub';
+    const homeLead = document.getElementById('home-lead');
+    if (homeLead) homeLead.textContent = 'Admin tools. Publish rules & stats, archive tournaments.';
   }
   setupNavigation();
   setupExternalLinks();

@@ -936,9 +936,16 @@ button {
   font-weight: 500;
 }
 
-.tournament-draft-team-player .player-salary {
+.tournament-draft-team-player .player-salary,
+.tournament-draft-team-sub .player-salary {
   color: var(--muted);
   margin-left: 8px;
+}
+
+.tournament-sub-item .player-salary {
+  color: var(--muted);
+  margin-left: 6px;
+  font-size: 0.9rem;
 }
 
 .tournament-draft-add-player-btn {
@@ -1585,6 +1592,12 @@ textarea:focus {
 #rules-preview-pane.visible {
   flex: 1;
   min-height: 0;
+  flex-direction: column;
+}
+
+.rules-preview-toolbar {
+  flex-shrink: 0;
+  margin-bottom: 0.5rem;
 }
 
 #rules-easy-pane.visible {
@@ -1617,6 +1630,11 @@ textarea:focus {
   min-height: 0;
   display: flex;
   flex-direction: column;
+}
+
+#stats-preview-pane .rules-preview-toolbar {
+  flex-shrink: 0;
+  margin-bottom: 0.5rem;
 }
 
 #stats-preview-pane.visible .rules-iframe {
@@ -1904,6 +1922,55 @@ textarea:focus {
 
 .rules-modal[hidden] {
   display: none !important;
+}
+
+.rules-diff-modal-content {
+  max-width: 90vw;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.rules-diff-body {
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  line-height: 1.4;
+  overflow: auto;
+  max-height: 60vh;
+  min-height: 200px;
+  background: var(--bg-dark, #0f172a);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 8px;
+  padding: 12px;
+  margin: 12px 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.rules-diff-body .diff-line {
+  padding: 2px 6px;
+  margin: 0 -6px;
+  border-radius: 2px;
+}
+
+.rules-diff-body .diff-line.diff-add {
+  background: rgba(34, 197, 94, 0.25);
+  color: #86efac;
+}
+
+.rules-diff-body .diff-line.diff-remove {
+  background: rgba(239, 68, 68, 0.25);
+  color: #fca5a5;
+}
+
+.rules-suggestions-dropdown {
+  min-width: 180px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  background: var(--bg-dark, #0f172a);
+  color: var(--text, #e2e8f0);
+  font-size: 0.9rem;
 }
 
 /* Staff build: hide master-only (token, Publish, Rollback). Master build: show them. */

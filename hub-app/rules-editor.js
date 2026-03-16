@@ -354,10 +354,96 @@
     return getMinimalPreviewPage(getSectionsHtml(model));
   }
 
+  /**
+   * Patch model values back into the original HTML so structure/format is preserved.
+   * Use this for Publish so the live site keeps its current look, not the Easy Edit rendered output.
+   */
+  function patchRulesIntoOriginalHtml(model, fullHtml, replaceStart, replaceEnd, heroStart, heroEnd) {
+    if (!fullHtml || replaceEnd <= replaceStart) return fullHtml;
+    const parser = new DOMParser();
+
+    let result = fullHtml;
+
+    if (heroStart != null && heroEnd != null && heroStart >= 0 && heroEnd > heroStart) {
+      const heroHtml = fullHtml.substring(heroStart, heroEnd);
+      const heroDoc = parser.parseFromString(heroHtml, 'text/html');
+      const heroRoot = heroDoc.body.firstElementChild;
+      if (heroRoot && model.hero) {
+        const h = model.hero;
+        const set = (sel, val) => { const el = heroRoot.querySelector(sel); if (el) el.textContent = val != null ? val : ''; };
+        const setBadges = () => {
+          const badges = heroRoot.querySelectorAll('.hero-badges .badge, .badge');
+          if (badges.length >= 4) {
+            badges[0].textContent = (h.seasonLabel || '').trim() || ' ';
+            badges[1].textContent = (h.formatsLabel || '').trim() || ' ';
+            badges[2].textContent = (h.gameLabel || '').trim() || ' ';
+            badges[3].textContent = (h.openLabel || '').trim() || ' ';
+          }
+        };
+        const eyebrow = heroRoot.querySelector('.hero-eyebrow, .hero-tagline, .tagline');
+        if (eyebrow) eyebrow.textContent = h.tagline || '';
+        const titleEl = heroRoot.querySelector('.hero-title, .hero h1, main h1');
+        if (titleEl) titleEl.textContent = (h.title || 'MOTION').replace(/\s+/g, '');
+        const subEl = heroRoot.querySelector('.hero-sub, .hero-subtitle, .hero-sub, .hero p, .subtitle');
+        if (subEl) subEl.textContent = h.subtitle || '';
+        setBadges();
+      }
+      const newHero = heroRoot ? heroRoot.outerHTML : heroHtml;
+      result = result.substring(0, heroStart) + newHero + result.substring(heroEnd);
+    }
+
+    const mainInner = fullHtml.substring(replaceStart, replaceEnd);
+    const wrap = '<div id="_main">' + mainInner + '</div>';
+    const doc = parser.parseFromString(wrap, 'text/html');
+    const mainDiv = doc.getElementById('_main');
+    if (!mainDiv) return result;
+
+    const formatCards = mainDiv.querySelectorAll('.format-card');
+    (model.formats || []).forEach((f, idx) => {
+      if (!formatCards[idx]) return;
+      const card = formatCards[idx];
+      const set = (sel, val) => { const el = card.querySelector(sel); if (el) el.textContent = val != null ? val : ''; };
+      set('.format-icon', f.icon);
+      set('.format-name, .format-name span', f.name);
+      set('.format-type', f.type);
+      set('.format-detail', f.detail);
+    });
+
+    const ruleCards = mainDiv.querySelectorAll('.rule-card');
+    const flatRules = (model.ruleSections || []).flatMap(sec => sec.rules || []);
+    flatRules.forEach((r, idx) => {
+      if (!ruleCards[idx]) return;
+      const card = ruleCards[idx];
+      const numEl = card.querySelector('.rule-num');
+      const titleEl = card.querySelector('.rule-title');
+      const textEl = card.querySelector('.rule-text');
+      if (numEl) numEl.textContent = r.num != null ? r.num : '';
+      if (titleEl) titleEl.textContent = r.title != null ? r.title : '';
+      if (textEl && r.contentHtml != null) textEl.innerHTML = r.contentHtml;
+    });
+
+    const staffCards = mainDiv.querySelectorAll('.staff-card');
+    (model.staff || []).forEach((s, idx) => {
+      if (!staffCards[idx]) return;
+      const card = staffCards[idx];
+      const set = (sel, val) => { const el = card.querySelector(sel); if (el) el.textContent = val != null ? val : ''; };
+      set('.staff-role', s.role);
+      set('.staff-name', s.name);
+      set('.staff-discord', s.discord);
+      const img = card.querySelector('.staff-avatar img');
+      if (img && s.imageUrl != null) img.src = s.imageUrl;
+    });
+
+    const newMainInner = mainDiv.innerHTML;
+    result = result.substring(0, replaceStart) + newMainInner + result.substring(replaceEnd);
+    return result;
+  }
+
   global.RulesEditor = {
     defaultModel,
     parseRulesHtml,
     renderRulesHtml,
+    patchRulesIntoOriginalHtml,
     sanitizeContentHtml
   };
 })(typeof window !== 'undefined' ? window : this);

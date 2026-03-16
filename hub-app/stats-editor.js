@@ -218,6 +218,87 @@
     return getMinimalStatsPreviewPage(getSectionsHtml(model));
   }
 
+  /** Detect which hero elements exist in the loaded HTML so Easy Edit only shows those fields. */
+  function getHeroShape(heroHtml) {
+    const out = { hasTagline: true, hasTitle: true, hasSubtitle: true, badgeCount: 4 };
+    if (!heroHtml || typeof heroHtml !== 'string') return out;
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(heroHtml, 'text/html');
+      if (!doc.body) return out;
+      out.hasTagline = !!doc.querySelector('.hero-eyebrow, .hero-tagline, .tagline, [class*="eyebrow"], [class*="tagline"]');
+      out.hasTitle = !!doc.querySelector('.hero-title, .hero h1, h1, [class*="title"]');
+      out.hasSubtitle = !!doc.querySelector('.hero-sub, .hero-subtitle, .hero p, .subtitle, [class*="subtitle"], [class*="hero-sub"]');
+      const badges = doc.querySelectorAll('.hero-badges .badge, .badge, .hero-badges span, [class*="badge"]');
+      out.badgeCount = Math.min(badges.length, 4);
+    } catch (_) {}
+    return out;
+  }
+
+  /** Patch model values into original region HTML to preserve format when publishing. */
+  function patchStatsHeroIntoOriginal(heroHtml, hero) {
+    if (!heroHtml || !hero) return heroHtml;
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(heroHtml, 'text/html');
+    const root = doc.body.firstElementChild;
+    if (!root) return heroHtml;
+    const set = (sel, val) => { const el = root.querySelector(sel); if (el) el.textContent = val != null ? val : ''; };
+    const eyebrow = root.querySelector('.hero-eyebrow, .hero-tagline, .tagline, [class*="eyebrow"]');
+    if (eyebrow) eyebrow.textContent = hero.tagline || '';
+    const titleEl = root.querySelector('.hero-title, .hero h1, h1');
+    if (titleEl) titleEl.textContent = (hero.title || 'MOTION').replace(/\s+/g, ' ').trim();
+    const subEl = root.querySelector('.hero-sub, .hero-subtitle, .hero p, .subtitle');
+    if (subEl) subEl.textContent = hero.subtitle || '';
+    const badges = root.querySelectorAll('.hero-badges .badge, .badge, .hero-badges span, [class*="badge"]');
+    if (badges.length >= 1) badges[0].textContent = hero.seasonLabel || '';
+    if (badges.length >= 2) badges[1].textContent = hero.formatsLabel || '';
+    if (badges.length >= 3) badges[2].textContent = hero.gameLabel || '';
+    if (badges.length >= 4) badges[3].textContent = hero.openLabel || '';
+    return root.outerHTML;
+  }
+
+  function patchStatsUpcomingIntoOriginal(upcomingHtml, upcoming) {
+    if (!upcomingHtml || !upcoming) return upcomingHtml;
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(upcomingHtml, 'text/html');
+    const titleEl = doc.querySelector('h2, .section-title, .upcoming-title, h3');
+    const bodyEl = doc.querySelector('p, .section-desc, .upcoming-body');
+    if (titleEl) titleEl.textContent = upcoming.title != null ? upcoming.title : '';
+    if (bodyEl) bodyEl.textContent = upcoming.bodyText != null ? upcoming.bodyText : '';
+    return doc.body.innerHTML;
+  }
+
+  function patchStatsHighlightsIntoOriginal(html, highlights) {
+    if (!html || !highlights) return html;
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+    const titleEl = doc.querySelector('h2, .section-title, .highlights-title, h3');
+    const bodyEl = doc.querySelector('.section-desc, p, .highlights-body');
+    if (titleEl) titleEl.textContent = highlights.title != null ? highlights.title : '';
+    if (bodyEl) bodyEl.textContent = highlights.bodyText != null ? highlights.bodyText : '';
+    return doc.body.innerHTML;
+  }
+
+  function patchStatsLeaderboardsIntoOriginal(html, leaderboards) {
+    if (!html || !leaderboards) return html;
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+    const titleEl = doc.querySelector('h2, .section-title, .leaderboard-title, h3');
+    const descEl = doc.querySelector('.section-desc, .leaderboard-desc, p');
+    if (titleEl) titleEl.textContent = leaderboards.title != null ? leaderboards.title : '';
+    if (descEl) descEl.textContent = leaderboards.description != null ? leaderboards.description : '';
+    return doc.body.innerHTML;
+  }
+
+  function patchStatsFooterIntoOriginal(html, footer) {
+    if (!html || !footer) return html;
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+    const el = doc.querySelector('.section-desc, p, [class*="footer"]') || doc.body;
+    if (el) el.textContent = footer.text != null ? footer.text : '';
+    return doc.body.innerHTML;
+  }
+
   global.StatsEditor = {
     defaultStatsModel,
     parseStatsFromRegions,
@@ -228,7 +309,13 @@
     renderStatsFooter,
     getSectionsHtml,
     getMinimalStatsPreviewPage,
-    renderStatsHtml
+    renderStatsHtml,
+    getHeroShape,
+    patchStatsHeroIntoOriginal,
+    patchStatsUpcomingIntoOriginal,
+    patchStatsHighlightsIntoOriginal,
+    patchStatsLeaderboardsIntoOriginal,
+    patchStatsFooterIntoOriginal
   };
   global.StatsEditorAPI = global.StatsEditor;
 })(typeof window !== 'undefined' ? window : this);

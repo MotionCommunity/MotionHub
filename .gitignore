@@ -8,6 +8,19 @@ hub-app/dist/
 hub-app/dist/win-unpacked/
 hub-app/dist/*.exe
 
+# Legacy .NET launcher build (removed; keep ignored in case of local leftovers)
+bin/
+obj/
+
+# Rust (replay parser)
+hub-app/replay-parser-boxcars/target/
+
+# Dev backup (run-master.js)
+hub-app/build-type.js.bak
+
 # Logs / misc
 *.log
 .DS_Store
+
+# Discord bot env (contains token)
+MotionBot/.env
