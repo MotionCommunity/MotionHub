@@ -65,10 +65,12 @@ Replace `YOUR_USERNAME` with your GitHub username. Use a [Personal Access Token]
    - `CLIENT_ID`
    - `GUILD_ID`
    - `CHANNEL_MATCH_ANNOUNCE`, `CHANNEL_MATCH_RESULTS`, `CHANNEL_PROCESSING_QUEUE`, `CHANNEL_STAFF_CHAT`
-   - `ROLE_STAFF`, `ROLE_REGISTERED`, `ROLE_CHECKED_IN`
+   - `ROLE_STAFF`
 4. Railway will build and run the bot. In **Logs** you should see something like: `Motion RL Bot is online as …`.
 
 You do **not** need to run the bot on your PC for production; the cloud instance keeps it online.
+
+5. **League site (Vercel) + replay timer:** If you use **Admin → Matches → Start match in Discord** on the hosted site, set **`BOT_INTERNAL_SECRET`** on Railway (same value as **`MOTION_BOT_INTERNAL_SECRET`** on Vercel) and **`MOTION_BOT_REGISTER_URL`** on Vercel to your Railway service **public URL** (base only, e.g. `https://….up.railway.app`). See **`league-platform/docs/PRODUCTION-VERCEL-RAILWAY.md`**.
 
 ---
 

@@ -1,0 +1,255 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum MatchStatus {
+  scheduled
+  in_progress
+  completed
+  disputed
+}
+
+enum ReplayParseStatus {
+  pending
+  parsed
+  failed
+}
+
+model Player {
+  id                String                   @id @default(uuid())
+  ign               String                   @unique
+  discordUsername   String?
+  discordUserId     String?
+  epicGamesId       String?
+  trackerUrl        String?
+  region            String?
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+  aliases           PlayerAlias[]
+  seriesMemberships PlayerSeriesMembership[]
+  teamPlayers       TeamPlayer[]
+  gameStats         PlayerGameStat[]
+  ratingHistory     PlayerRatingHistory[]
+  salaryHistory     SalaryHistory[]
+}
+
+model PlayerAlias {
+  id        String    @id @default(uuid())
+  playerId  String
+  alias     String
+  validFrom DateTime
+  validTo   DateTime?
+  player    Player    @relation(fields: [playerId], references: [id], onDelete: Cascade)
+}
+
+model SeriesTier {
+  id          String                   @id @default(uuid())
+  code        String                   @unique
+  name        String
+  orderIndex  Int
+  memberships PlayerSeriesMembership[]
+}
+
+model PlayerSeriesMembership {
+  id          String      @id @default(uuid())
+  playerId    String
+  seriesTierId String
+  effectiveFrom DateTime
+  effectiveTo   DateTime?
+  reason        String
+  player      Player      @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  seriesTier  SeriesTier  @relation(fields: [seriesTierId], references: [id], onDelete: Cascade)
+}
+
+model Tournament {
+  id                   String   @id @default(uuid())
+  externalTournamentId Int?
+  name                 String
+  format               String?
+  bracketType          String?
+  status               String?
+  startedAt            DateTime?
+  endedAt              DateTime?
+  createdAt            DateTime @default(now())
+  teams                Team[]
+  matches              Match[]
+}
+
+model Team {
+  id                    String      @id @default(uuid())
+  tournamentId          String
+  name                  String
+  seed                  Int?
+  placement             Int?
+  /// Discord role ID for this roster (used for pings & channel overwrites).
+  discordRoleId         String?
+  /// Team text channel (paste after creating in Discord with role-only visibility).
+  discordTextChannelId  String?
+  /// Team voice channel ID (optional).
+  discordVoiceChannelId String?
+  tournament            Tournament  @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  players               TeamPlayer[]
+}
+
+model TeamPlayer {
+  id       String  @id @default(uuid())
+  teamId    String
+  playerId  String
+  role      String
+  team      Team    @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  player    Player  @relation(fields: [playerId], references: [id], onDelete: Cascade)
+}
+
+model Match {
+  id            String      @id @default(uuid())
+  tournamentId  String
+  roundCode     String?
+  slot          String?
+  teamAId       String?
+  teamBId       String?
+  winnerTeamId  String?
+  bestOf        Int?
+  status        MatchStatus @default(scheduled)
+  scheduledAt   DateTime?
+  playedAt      DateTime?
+  discordChannelId String?
+  teamARoleId      String?
+  teamBRoleId      String?
+  checkInMessageId String?
+  checkInRequestedAt DateTime?
+  teamACheckedInAt DateTime?
+  teamBCheckedInAt DateTime?
+  /// When "match pod" is created: dedicated text channel for replays (both teams + staff).
+  discordPodTextChannelId   String?
+  /// Team-only voice (this match).
+  discordPodVoiceAChannelId String?
+  discordPodVoiceBChannelId String?
+  tournament    Tournament  @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  games         Game[]
+}
+
+model Game {
+  id              String      @id @default(uuid())
+  matchId         String
+  gameNumber      Int
+  winnerTeamId    String?
+  durationSeconds Int?
+  overtimeSeconds Int?
+  match           Match       @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  replayFiles     ReplayFile[]
+  playerStats     PlayerGameStat[]
+
+  @@unique([matchId, gameNumber])
+}
+
+model ReplayFile {
+  id           String            @id @default(uuid())
+  gameId        String?
+  storageKey    String
+  sha256        String?
+  uploadedBy    String?
+  parserStatus  ReplayParseStatus @default(pending)
+  parserError   String?
+  createdAt     DateTime          @default(now())
+  game          Game?             @relation(fields: [gameId], references: [id], onDelete: SetNull)
+}
+
+model PlayerGameStat {
+  id              String   @id @default(uuid())
+  gameId           String
+  playerId         String
+  teamId           String?
+  goals            Int      @default(0)
+  assists          Int      @default(0)
+  saves            Int      @default(0)
+  shots            Int      @default(0)
+  demosInflicted   Int      @default(0)
+  demosTaken       Int      @default(0)
+  score            Int      @default(0)
+  mvp              Boolean  @default(false)
+
+  // Platform / identity
+  platform         String?
+  onlineId         String?
+
+  // Boost
+  bpm                    Float?
+  avgBoostAmount         Float?
+  amountCollected        Float?
+  amountCollectedBig     Float?
+  amountCollectedSmall   Float?
+  countCollectedBig      Int?
+  countCollectedSmall    Int?
+  amountStolen           Float?
+  amountStolenBig        Float?
+  amountStolenSmall      Float?
+  countStolenBig         Int?
+  countStolenSmall       Int?
+  timeZeroBoost          Float?
+  timeFullBoost          Float?
+  amountUsedWhileSupersonic Float?
+  amountOverfill         Float?
+  amountOverfillStolen   Float?
+
+  // Movement
+  avgSpeed               Float?
+  totalDistance           Float?
+  timeSlowSpeed          Float?
+  timeBoostSpeed         Float?
+  timeSupersonic         Float?
+  timeOnGround           Float?
+  timeLowAir             Float?
+  timeHighAir            Float?
+  timePowerslide         Float?
+  countPowerslide        Int?
+
+  // Positioning
+  timeDefensiveThird     Float?
+  timeNeutralThird       Float?
+  timeOffensiveThird     Float?
+  timeDefensiveHalf      Float?
+  timeOffensiveHalf      Float?
+  timeBehindBall         Float?
+  timeInFrontBall        Float?
+  avgDistanceToBall      Float?
+  avgDistanceToBallHasPossession   Float?
+  avgDistanceToBallNoPossession    Float?
+
+  // Camera
+  cameraFov              Float?
+  cameraHeight           Float?
+  cameraAngle            Float?
+  cameraDistance          Float?
+  cameraStiffness        Float?
+  cameraSwivel           Float?
+
+  game             Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  player           Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+}
+
+model PlayerRatingHistory {
+  id               String   @id @default(uuid())
+  playerId         String
+  rating           Float
+  mu               Float?
+  sigma            Float?
+  algorithmVersion String
+  recordedAt       DateTime @default(now())
+  player           Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+}
+
+model SalaryHistory {
+  id               String   @id @default(uuid())
+  playerId         String
+  oldSalary        Int
+  newSalary        Int
+  reason           String
+  algorithmVersion String
+  recordedAt       DateTime @default(now())
+  player           Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+}

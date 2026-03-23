@@ -1,62 +1,19 @@
-const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits, MessageFlags } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits, MessageFlags, ChannelType } = require('discord.js');
+const { config } = require('./config');
 
 const matchTimers = new Map();
 
+/** Match replay context: forum thread (legacy) or guild text channel (league-site pod). */
+function isMatchReplayChannel(channel) {
+    if (channel.isThread()) return true;
+    return channel.type === ChannelType.GuildText && matchTimers.has(channel.id);
+}
+
+function roomLabel(roomKey) {
+    return config.labels.matchRoomNames[roomKey] || `Match Room ${roomKey}`;
+}
+
 const commands = [
-
-    // ── /checkin ──────────────────────────────────────────────────────────
-    {
-        data: new SlashCommandBuilder()
-            .setName('checkin')
-            .setDescription('Check in for the tournament'),
-
-        async execute(interaction) {
-            const member = interaction.member;
-            const checkedInRole = interaction.guild.roles.cache.get(process.env.ROLE_CHECKED_IN);
-
-            if (!member.roles.cache.has(process.env.ROLE_REGISTERED)) {
-                return interaction.reply({
-                    content: '❌ You must be a registered player to check in. Please complete registration first.',
-                    flags: MessageFlags.Ephemeral
-                });
-            }
-
-            if (member.roles.cache.has(process.env.ROLE_CHECKED_IN)) {
-                return interaction.reply({
-                    content: '✅ You are already checked in!',
-                    flags: MessageFlags.Ephemeral
-                });
-            }
-
-            await member.roles.add(checkedInRole);
-
-            const embed = new EmbedBuilder()
-                .setColor(0x22C55E)
-                .setTitle('✅ Checked In Successfully!')
-                .setDescription(`**${member.displayName}** is checked in and ready to compete.`)
-                .addFields(
-                    { name: 'Status', value: '🟢 Ready', inline: true },
-                    { name: 'Next Step', value: 'Wait for the draft to open in #draft-room', inline: true }
-                )
-                .setFooter({ text: 'Motion RL Tournament' })
-                .setTimestamp();
-
-            await interaction.reply({ embeds: [embed] });
-
-            const staffChannel = interaction.guild.channels.cache.get(process.env.CHANNEL_STAFF_CHAT);
-            if (staffChannel) {
-                const logEmbed = new EmbedBuilder()
-                    .setColor(0x3B82F6)
-                    .setTitle('📋 Player Checked In')
-                    .addFields(
-                        { name: 'Player', value: member.displayName, inline: true },
-                        { name: 'Discord', value: `<@${member.id}>`, inline: true },
-                    )
-                    .setTimestamp();
-                await staffChannel.send({ embeds: [logEmbed] });
-            }
-        }
-    },
 
     // ── /match ────────────────────────────────────────────────────────────
     {
@@ -93,9 +50,9 @@ const commands = [
                     .setDescription('Which match room to use')
                     .setRequired(true)
                     .addChoices(
-                        { name: 'Match Room 1', value: '1' },
-                        { name: 'Match Room 2', value: '2' },
-                        { name: 'Match Room 3', value: '3' },
+                        { name: config.labels.matchRoomNames['1'], value: '1' },
+                        { name: config.labels.matchRoomNames['2'], value: '2' },
+                        { name: config.labels.matchRoomNames['3'], value: '3' },
                     ))
             )
             .addSubcommand(sub => sub
@@ -114,6 +71,7 @@ const commands = [
                 const round  = interaction.options.getString('round');
                 const format = interaction.options.getString('format');
                 const room   = interaction.options.getString('room');
+                const voiceLabel = roomLabel(room);
 
                 const replayCounts = {
                     BO1: '1 replay',
@@ -132,7 +90,7 @@ const commands = [
                 const team2Display = team2Role ? `<@&${team2Role.id}>` : `**${team2}**`;
 
                 // Post ready-up embed in #match-announcements
-                const announceChannel = interaction.guild.channels.cache.get(process.env.CHANNEL_MATCH_ANNOUNCE);
+                const announceChannel = interaction.guild.channels.cache.get(config.channels.matchAnnounce);
                 if (!announceChannel) {
                     return interaction.reply({
                         content: '❌ Could not find #match-announcements channel.',
@@ -146,14 +104,14 @@ const commands = [
                     .setDescription(
                         `${team1Display}  vs  ${team2Display}\n\n` +
                         `Both teams react ✅ below to confirm ready.\n` +
-                        `Then join 🔊 **Match Room ${room}**`
+                        `Then join 🔊 **${voiceLabel}**`
                     )
                     .addFields(
                         { name: '⏱️ Ready-Up Deadline', value: '15 minutes — or match escalates to staff', inline: false },
                         { name: '📁 Replays Required', value: replayCounts[format], inline: true },
-                        { name: '🔊 Voice Room', value: `Match Room ${room}`, inline: true }
+                        { name: '🔊 Voice Room', value: voiceLabel, inline: true }
                     )
-                    .setFooter({ text: 'Motion RL Tournament • React ✅ to confirm ready' })
+                    .setFooter({ text: `${config.labels.footer} • React ✅ to confirm ready` })
                     .setTimestamp();
 
                 const pingContent = [
@@ -168,7 +126,7 @@ const commands = [
                 await announceMsg.react('✅');
 
                 // Create match thread in #match-results
-                const matchChannel = interaction.guild.channels.cache.get(process.env.CHANNEL_MATCH_RESULTS);
+                const matchChannel = interaction.guild.channels.cache.get(config.channels.matchResults);
                 if (!matchChannel) {
                     return interaction.reply({
                         content: '❌ Could not find #match-results channel.',
@@ -188,17 +146,17 @@ const commands = [
                     .setDescription(`${team1Display}  vs  ${team2Display}`)
                     .addFields(
                         { name: '📁 Replays Required', value: replayCounts[format], inline: true },
-                        { name: '🔊 Voice Room', value: `Match Room ${room}`, inline: true },
+                        { name: '🔊 Voice Room', value: voiceLabel, inline: true },
                         { name: '⏱️ Submission Timer', value: '15 minutes from first .replay upload', inline: false },
                         { name: '📤 Winning Team', value: 'Upload all .replay files from this series here once complete.', inline: false },
                         { name: '📥 Losing Team', value: 'Type `/confirm` to agree with the result.\nType `/dispute [reason]` if you disagree.', inline: false },
                         { name: '⚠️ Warning', value: 'No replay submission within 15 minutes = default loss awarded to opposing team.', inline: false }
                     )
-                    .setFooter({ text: 'Motion RL Tournament • Timer starts on first .replay upload' })
+                    .setFooter({ text: `${config.labels.footer} • Timer starts on first .replay upload` })
                     .setTimestamp();
 
                 await thread.send({ embeds: [threadEmbed] });
-                await thread.send(`<@&${process.env.ROLE_STAFF}> — Match thread opened.`);
+                await thread.send(`<@&${config.roles.staff}> — Match thread opened.`);
 
                 // Store match data for timer tracking
                 matchTimers.set(thread.id, {
@@ -236,7 +194,7 @@ const commands = [
                     .setColor(0x22C55E)
                     .setTitle('✅ Match Complete — Thread Archived')
                     .setDescription('This match has been processed. Thread is now locked and archived.')
-                    .setFooter({ text: 'Motion RL Tournament' })
+                    .setFooter({ text: config.labels.footer })
                     .setTimestamp();
 
                 await thread.send({ embeds: [closeEmbed] });
@@ -257,9 +215,9 @@ const commands = [
         async execute(interaction) {
             const thread = interaction.channel;
 
-            if (!thread.isThread()) {
+            if (!isMatchReplayChannel(thread)) {
                 return interaction.reply({
-                    content: '❌ This command can only be used inside a match thread.',
+                    content: '❌ Use this in a match results thread or the match replay channel (pod).',
                     flags: MessageFlags.Ephemeral
                 });
             }
@@ -298,13 +256,13 @@ const commands = [
                     { name: 'Replays Found', value: `${replayFiles.length} file(s)`, inline: true },
                     { name: 'Next Step', value: 'Staff will process this match. Thread stays open until `/match close` is run.', inline: false }
                 )
-                .setFooter({ text: 'Motion RL Tournament' })
+                .setFooter({ text: config.labels.footer })
                 .setTimestamp();
 
             await interaction.reply({ embeds: [confirmEmbed] });
 
             // Post to #processing-queue
-            const queueChannel = interaction.guild.channels.cache.get(process.env.CHANNEL_PROCESSING_QUEUE);
+            const queueChannel = interaction.guild.channels.cache.get(config.channels.processingQueue);
             if (queueChannel) {
                 const queueEmbed = new EmbedBuilder()
                     .setColor(0x0F3460)
@@ -343,7 +301,7 @@ const commands = [
                             inline: false
                         }
                     )
-                    .setFooter({ text: 'Motion RL Tournament • Run /match close after processing' })
+                    .setFooter({ text: `${config.labels.footer} • Run /match close after processing` })
                     .setTimestamp();
 
                 const attachments = replayFiles.map(f => ({
@@ -352,14 +310,14 @@ const commands = [
                 }));
 
                 await queueChannel.send({
-                    content: `<@&${process.env.ROLE_STAFF}> — New match ready to process!`,
+                    content: `<@&${config.roles.staff}> — New match ready to process!`,
                     embeds: [queueEmbed],
                     files: attachments.length > 0 ? attachments : []
                 });
             }
 
             // Ping staff in #staff-chat
-            const staffChannel = interaction.guild.channels.cache.get(process.env.CHANNEL_STAFF_CHAT);
+            const staffChannel = interaction.guild.channels.cache.get(config.channels.staffChat);
             if (staffChannel) {
                 const staffEmbed = new EmbedBuilder()
                     .setColor(0x22C55E)
@@ -373,7 +331,7 @@ const commands = [
                     .setTimestamp();
 
                 await staffChannel.send({
-                    content: `<@&${process.env.ROLE_STAFF}>`,
+                    content: `<@&${config.roles.staff}>`,
                     embeds: [staffEmbed]
                 });
             }
@@ -414,7 +372,7 @@ const commands = [
 
             await interaction.reply({ embeds: [embed] });
 
-            const staffChannel = interaction.guild.channels.cache.get(process.env.CHANNEL_STAFF_CHAT);
+            const staffChannel = interaction.guild.channels.cache.get(config.channels.staffChat);
             if (staffChannel) {
                 const staffEmbed = new EmbedBuilder()
                     .setColor(0xEF4444)
@@ -428,7 +386,7 @@ const commands = [
                     .setTimestamp();
 
                 await staffChannel.send({
-                    content: `<@&${process.env.ROLE_STAFF}>`,
+                    content: `<@&${config.roles.staff}>`,
                     embeds: [staffEmbed]
                 });
             }
@@ -436,4 +394,24 @@ const commands = [
     }
 ];
 
-module.exports = { commands, matchTimers };
+/**
+ * Called from HTTP endpoint when staff starts a match from the league site (same state as /match create).
+ */
+function registerMatchTimer(channelId, data) {
+    if (!channelId || !data?.guildId) return false;
+    matchTimers.set(channelId, {
+        team1: String(data.team1 || "Team A"),
+        team2: String(data.team2 || "Team B"),
+        round: String(data.round || "—"),
+        format: String(data.format || "BO3"),
+        replayUploaded: false,
+        confirmed: false,
+        timerStarted: false,
+        timer: null,
+        threadId: channelId,
+        guildId: String(data.guildId)
+    });
+    return true;
+}
+
+module.exports = { commands, matchTimers, registerMatchTimer };

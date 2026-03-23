@@ -1,0 +1,5 @@
+{$SYNC_DOMAIN} {
+  encode gzip
+  reverse_proxy notes-api:4001
+}
+

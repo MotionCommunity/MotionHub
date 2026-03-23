@@ -244,6 +244,15 @@ function updateTournamentTeams(id, teams) {
   save();
 }
 
+function updateTournamentSalaryCap(id, salaryCap) {
+  const d = getDb();
+  const t = getTournament(id);
+  if (!t) return;
+  const cap = salaryCap != null ? Math.max(0, parseInt(salaryCap, 10) || 0) : (t.salaryCap ?? 300);
+  d.run('UPDATE Tournaments SET SalaryCap = ? WHERE Id = ?', [cap, id]);
+  save();
+}
+
 function getTeamSubs(tournamentId, teamName) {
   const d = getDb();
   const rows = rowsFromExec(d, 'SELECT PlayerId FROM TournamentTeamSubs WHERE TournamentId = ? AND TeamName = ? ORDER BY PlayerId', [tournamentId, teamName]);
@@ -502,6 +511,7 @@ module.exports = {
   addTournamentSub,
   removeTournamentSub,
   updateTournamentTeams,
+  updateTournamentSalaryCap,
   getTeamSubs,
   getAllTeamSubsByTeam,
   addTeamSub,

@@ -1,7 +1,9 @@
 require('dotenv').config();
-const { Client, GatewayIntentBits, Partials, Collection, REST, Routes, EmbedBuilder } = require('discord.js');
+const http = require('http');
+const { Client, GatewayIntentBits, Partials, Collection, REST, Routes, EmbedBuilder, ChannelType } = require('discord.js');
+const { config } = require('./config');
 const { commands } = require('./commands');
-const { matchTimers } = require('./commands');
+const { matchTimers, registerMatchTimer } = require('./commands');
 const { startSchedulePoller } = require('./schedule-poller');
 
 const client = new Client({
@@ -22,13 +24,13 @@ for (const command of commands) {
 }
 
 // ── Register Slash Commands ───────────────────────────────────────────────
-const rest = new REST().setToken(process.env.TOKEN);
+const rest = new REST().setToken(config.discord.token);
 
 (async () => {
     try {
         console.log('⏳ Registering slash commands...');
         await rest.put(
-            Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID),
+            Routes.applicationGuildCommands(config.discord.clientId, config.discord.guildId),
             { body: commands.map(c => c.data.toJSON()) }
         );
         console.log('✅ Slash commands registered successfully');
@@ -41,7 +43,7 @@ const rest = new REST().setToken(process.env.TOKEN);
 client.once('ready', () => {
     console.log(`✅ Motion RL Bot is online as ${client.user.tag}`);
     console.log(`📡 Connected to ${client.guilds.cache.size} server(s)`);
-    client.user.setActivity('Motion RL Tournaments', { type: 3 });
+    client.user.setActivity(config.labels.activity, { type: 3 });
     startSchedulePoller(client);
 });
 
@@ -61,7 +63,10 @@ client.on('interactionCreate', async interaction => {
 // ── Replay Upload Timer ───────────────────────────────────────────────────
 client.on('messageCreate', async message => {
     if (message.author.bot) return;
-    if (!message.channel.isThread()) return;
+    const isThread = message.channel.isThread();
+    const isPodText =
+        message.channel.type === ChannelType.GuildText && matchTimers.has(message.channel.id);
+    if (!isThread && !isPodText) return;
 
     const matchData = matchTimers.get(message.channel.id);
     if (!matchData) return;
@@ -89,7 +94,7 @@ client.on('messageCreate', async message => {
     matchData.timer = setTimeout(async () => {
         if (matchData.confirmed) return;
 
-        const staffChannel = message.guild.channels.cache.get(process.env.CHANNEL_STAFF_CHAT);
+        const staffChannel = message.guild.channels.cache.get(config.channels.staffChat);
         if (staffChannel) {
             const escalateEmbed = new EmbedBuilder()
                 .setColor(0xEF4444)
@@ -106,7 +111,7 @@ client.on('messageCreate', async message => {
                 .setTimestamp();
 
             await staffChannel.send({
-                content: `<@&${process.env.ROLE_STAFF}> — Replay timer expired, no confirmation received.`,
+                content: `<@&${config.roles.staff}> — Replay timer expired, no confirmation received.`,
                 embeds: [escalateEmbed]
             });
         }
@@ -117,4 +122,45 @@ client.on('messageCreate', async message => {
 
     }, 15 * 60 * 1000);
 });
-client.login(process.env.TOKEN);
+
+// ── HTTP: register match thread for replay timer (league site "Start match in Discord") ──
+const botInternalSecret = process.env.BOT_INTERNAL_SECRET?.trim();
+const botHttpPort = Number(process.env.BOT_HTTP_PORT || process.env.PORT || 3849);
+
+if (botInternalSecret) {
+    http.createServer((req, res) => {
+        if (req.method !== 'POST' || req.url !== '/internal/register-match-thread') {
+            res.writeHead(404, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'not found' }));
+            return;
+        }
+        const auth = req.headers.authorization || '';
+        if (auth !== `Bearer ${botInternalSecret}`) {
+            res.writeHead(401, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'unauthorized' }));
+            return;
+        }
+        let body = '';
+        req.on('data', (c) => {
+            body += c;
+        });
+        req.on('end', () => {
+            try {
+                const json = JSON.parse(body || '{}');
+                const channelId = json.channelId || json.threadId;
+                const ok = registerMatchTimer(channelId, json);
+                res.writeHead(ok ? 200 : 400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify(ok ? { ok: true } : { error: 'need channelId or threadId and guildId' }));
+            } catch (e) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: String(e?.message || e) }));
+            }
+        });
+    }).listen(botHttpPort, '0.0.0.0', () => {
+        console.log(`[Timer API] POST /internal/register-match-thread on port ${botHttpPort} (league site replay timer)`);
+    });
+} else {
+    console.log('[Timer API] Set BOT_INTERNAL_SECRET to allow the league site to register replay timers.');
+}
+
+client.login(config.discord.token);

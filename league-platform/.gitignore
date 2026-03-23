@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.env
+.env.*
+*.log
+
+# Prisma — keep `packages/db/prisma/migrations/` **committed** for deploys / teammates
+
+# OS / editor
+.DS_Store
+Thumbs.db

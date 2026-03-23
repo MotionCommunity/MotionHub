@@ -172,23 +172,26 @@ ipcMain.handle('app:getDraftTeamPresets', () => {
   return Array.isArray(list) ? list : [];
 });
 
-ipcMain.handle('app:saveDraftTeamPreset', (_event, { name, teamIds }) => {
+ipcMain.handle('app:saveDraftTeamPreset', (_event, { name, teamIds, salaryCap }) => {
   const list = loadConfig().draftTeamPresets;
   const presets = Array.isArray(list) ? [...list] : [];
+  const cap = salaryCap != null && salaryCap !== '' ? Math.max(0, parseInt(salaryCap, 10) || 0) : null;
   presets.push({
     name: (name && String(name).trim()) || 'Preset',
     teamIds: Array.isArray(teamIds) ? teamIds : [],
+    salaryCap: cap,
   });
   saveConfig({ draftTeamPresets: presets });
   return true;
 });
 
-ipcMain.handle('app:updateDraftTeamPreset', (_event, index, { name, teamIds }) => {
+ipcMain.handle('app:updateDraftTeamPreset', (_event, index, { name, teamIds, salaryCap }) => {
   const list = loadConfig().draftTeamPresets;
   const presets = Array.isArray(list) ? [...list] : [];
   if (index < 0 || index >= presets.length) return false;
   if (name !== undefined) presets[index].name = (name && String(name).trim()) || presets[index].name;
   if (teamIds !== undefined) presets[index].teamIds = Array.isArray(teamIds) ? teamIds : presets[index].teamIds || [];
+  if (salaryCap !== undefined) presets[index].salaryCap = salaryCap != null && salaryCap !== '' ? Math.max(0, parseInt(salaryCap, 10) || 0) : null;
   saveConfig({ draftTeamPresets: presets });
   return true;
 });
@@ -421,14 +424,16 @@ ipcMain.handle('notes:fetchSuggestedRules', async () => {
 });
 
 // Suggested stats (staff submit; master fetches to confirm and publish)
-ipcMain.handle('notes:submitSuggestedStats', async (_event, html) => {
+ipcMain.handle('notes:submitSuggestedStats', async (_event, payload) => {
   const base = getNotesSyncBase();
   const url = `${base}/api/suggested-stats`;
   try {
+    const html = typeof payload === 'string' ? payload : (payload && payload.html);
+    const submittedBy = typeof payload === 'object' && payload && payload.submittedBy != null ? String(payload.submittedBy) : '';
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ html: html || '' }),
+      body: JSON.stringify({ html: html || '', submittedBy: submittedBy || '' }),
     });
     const text = await res.text();
     if (!res.ok) {
@@ -437,7 +442,8 @@ ipcMain.handle('notes:submitSuggestedStats', async (_event, html) => {
         : (text || res.statusText);
       return { ok: false, error: msg };
     }
-    return { ok: true };
+    const data = text ? JSON.parse(text) : {};
+    return { ok: true, id: data.id };
   } catch (e) {
     return { ok: false, error: e.message };
   }
@@ -452,12 +458,60 @@ ipcMain.handle('notes:fetchSuggestedStats', async () => {
       const msg = res.status === 404
         ? 'Suggested stats API not found (404). Redeploy the notes-api so it includes /api/suggested-stats.'
         : (text || res.statusText);
-      return { ok: false, error: msg, html: '' };
+      return { ok: false, error: msg, list: [], items: [] };
     }
     const data = JSON.parse(text || '{}');
-    return { ok: true, html: data.html || '' };
+    const list = data.list || [];
+    const items = data.items || [];
+    return { ok: true, list, items };
   } catch (e) {
-    return { ok: false, error: e.message, html: '' };
+    return { ok: false, error: e.message, list: [], items: [] };
+  }
+});
+
+// Suggested bracket (staff submit; master fetches to confirm and publish)
+ipcMain.handle('notes:submitSuggestedBracket', async (_event, payload) => {
+  const base = getNotesSyncBase();
+  const url = `${base}/api/suggested-bracket`;
+  try {
+    const bracketDraft = typeof payload === 'object' && payload && payload.bracketDraft !== undefined ? payload.bracketDraft : payload;
+    const submittedBy = typeof payload === 'object' && payload && payload.submittedBy != null ? String(payload.submittedBy) : '';
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ bracketDraft: bracketDraft || null, submittedBy: submittedBy || '' }),
+    });
+    const text = await res.text();
+    if (!res.ok) {
+      const msg = res.status === 404
+        ? 'Suggested bracket API not found (404). Redeploy the notes-api so it includes /api/suggested-bracket.'
+        : (text || res.statusText);
+      return { ok: false, error: msg };
+    }
+    const data = text ? JSON.parse(text) : {};
+    return { ok: true, id: data.id };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+});
+ipcMain.handle('notes:fetchSuggestedBracket', async () => {
+  const base = getNotesSyncBase();
+  const url = `${base}/api/suggested-bracket`;
+  try {
+    const res = await fetch(url);
+    const text = await res.text();
+    if (!res.ok) {
+      const msg = res.status === 404
+        ? 'Suggested bracket API not found (404). Redeploy the notes-api so it includes /api/suggested-bracket.'
+        : (text || res.statusText);
+      return { ok: false, error: msg, list: [], items: [] };
+    }
+    const data = JSON.parse(text || '{}');
+    const list = data.list || [];
+    const items = data.items || [];
+    return { ok: true, list, items };
+  } catch (e) {
+    return { ok: false, error: e.message, list: [], items: [] };
   }
 });
 
@@ -516,6 +570,11 @@ ipcMain.handle('tournament:delete', (_event, id) => {
 
 ipcMain.handle('tournament:updateSettings', (_event, id, { teamSize, seriesFormat, bracketType, roundSeriesFormats, formatLocked, overrideLock }) => {
   tournamentDb.updateTournamentSettings(id, { teamSize, seriesFormat, bracketType, roundSeriesFormats, formatLocked, overrideLock });
+  return true;
+});
+
+ipcMain.handle('tournament:updateSalaryCap', (_event, id, salaryCap) => {
+  tournamentDb.updateTournamentSalaryCap(id, salaryCap);
   return true;
 });
 

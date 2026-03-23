@@ -22,5 +22,10 @@ hub-app/build-type.js.bak
 *.log
 .DS_Store
 
+# Secrets — never commit real tokens (see root `.env.example` for names only)
+.env
+.env.local
+.env.*.local
+
 # Discord bot env (contains token)
 MotionBot/.env

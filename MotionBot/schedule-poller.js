@@ -1,18 +1,20 @@
 /**
  * Schedule poller: reads Motion Hub tournament-sync API (scheduledMatches) and posts
  * match calls to CHANNEL_MATCH_ANNOUNCE when status is "calling", startRequestedAt is set, or startAt has passed.
- * Env: TOURNAMENT_SYNC_URL (Hub's Notes sync URL), CHANNEL_MATCH_ANNOUNCE, optional POLL_INTERVAL_MS.
+ * See ../config.js and .env.example.
  */
+
+const { config } = require('./config');
 
 const calledMatchIds = new Set();
 
 function getSyncUrl() {
-  const base = (process.env.TOURNAMENT_SYNC_URL || 'https://motion-notes-api.vercel.app').replace(/\/$/, '');
+  const base = config.tournamentSync.url;
   return `${base}/api/tournament-sync`;
 }
 
 function getMatchChannelId() {
-  return process.env.CHANNEL_MATCH_ANNOUNCE || process.env.DISCORD_MATCH_CHANNEL_ID || null;
+  return config.channels.matchAnnounce || null;
 }
 
 function shouldCallMatch(match) {
@@ -82,8 +84,6 @@ async function pollAndPost(client) {
   }
 }
 
-const POLL_INTERVAL_MS = Math.max(15000, parseInt(process.env.POLL_INTERVAL_MS || '60000', 10));
-
 /**
  * Call from index.js when client is ready.
  * @param {import('discord.js').Client} client
@@ -91,12 +91,13 @@ const POLL_INTERVAL_MS = Math.max(15000, parseInt(process.env.POLL_INTERVAL_MS |
 function startSchedulePoller(client) {
   const channelId = getMatchChannelId();
   if (!channelId) {
-    console.log('[Schedule] CHANNEL_MATCH_ANNOUNCE not set; schedule poller disabled.');
+    console.log('[Schedule] CHANNEL_MATCH_ANNOUNCE (or DISCORD_MATCH_CHANNEL_ID) not set; schedule poller disabled.');
     return;
   }
-  console.log('[Schedule] Polling', getSyncUrl(), 'every', POLL_INTERVAL_MS / 1000, 's');
+  const ms = config.tournamentSync.pollIntervalMs;
+  console.log('[Schedule] Polling', getSyncUrl(), 'every', ms / 1000, 's');
   pollAndPost(client);
-  setInterval(() => pollAndPost(client), POLL_INTERVAL_MS);
+  setInterval(() => pollAndPost(client), ms);
 }
 
 module.exports = { startSchedulePoller };

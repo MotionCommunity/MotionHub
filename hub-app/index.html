@@ -29,6 +29,7 @@
           <button class="nav-item active" data-section="home">Home</button>
           <button class="nav-item" data-section="rules">Rules</button>
           <button class="nav-item" data-section="stats">Stats</button>
+          <button class="nav-item" data-section="bracket">Bracket</button>
           <button class="nav-item nav-item-with-dot" data-section="tournament" id="nav-item-tournament">Tournament</button>
           <button class="nav-item" data-section="forms">Forms</button>
           <button class="nav-item" data-section="notes">Staff Notes</button>
@@ -196,7 +197,12 @@
               <button type="button" class="primary" id="stats-submit-btn">Submit suggested changes</button>
               <span class="master-only">
                 <button type="button" class="primary" id="stats-publish-btn">Publish</button>
-                <button type="button" class="secondary" id="stats-load-suggested-btn">Load staff suggestion</button>
+                <select id="stats-suggestions-dropdown" class="rules-suggestions-dropdown" title="Pick a staff suggestion">
+                  <option value="">— Staff suggestions —</option>
+                </select>
+                <button type="button" class="secondary" id="stats-load-selected-btn">Load selected</button>
+                <button type="button" class="secondary" id="stats-refresh-suggestions-btn" title="Refresh list">Refresh list</button>
+                <button type="button" class="secondary" id="stats-diff-btn">Show changes vs live</button>
                 <button type="button" class="secondary" id="stats-insert-markers-btn" title="Add MOTION-HUB-EDIT comments so the hub can always find hero and upcoming">Insert markers</button>
                 <span class="rules-token-wrap">
                   <input type="password" id="stats-token-input" class="rules-token-input" placeholder="GitHub token (for Publish)" />
@@ -276,6 +282,97 @@
               <span id="stats-source-status" class="status"></span>
             </div>
             <textarea id="stats-source-editor" class="rules-source-editor" spellcheck="false" placeholder="Click &quot;Load from GitHub&quot; to fetch the current stats index.html."></textarea>
+          </div>
+          <div id="stats-diff-modal" class="rules-modal" hidden>
+            <div class="rules-modal-content rules-diff-modal-content">
+              <h2>Changes vs live stats</h2>
+              <p class="muted">Green = added in suggestion, red = removed from live.</p>
+              <div id="stats-diff-body" class="rules-diff-body"></div>
+              <div class="rules-modal-actions">
+                <button type="button" class="secondary" id="stats-diff-close">Close</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="section-bracket" class="section">
+          <header class="section-header">
+            <h1>Bracket</h1>
+            <div class="rules-actions">
+              <button type="button" class="rules-tab bracket-tab active" data-bracket-tab="preview">Preview</button>
+              <button type="button" class="rules-tab bracket-tab" data-bracket-tab="edit">Edit bracket</button>
+            </div>
+          </header>
+          <div id="bracket-preview-pane" class="rules-pane visible">
+            <div class="rules-preview-toolbar">
+              <button
+                type="button"
+                class="secondary"
+                id="bracket-preview-refresh-btn"
+                title="Reload to show latest from GitHub"
+              >
+                Refresh preview
+              </button>
+              <span id="bracket-preview-status" class="status"></span>
+            </div>
+            <iframe
+              title="Bracket preview"
+              src="https://motioncommunity.github.io/stats/"
+              class="rules-iframe"
+              id="bracket-preview-iframe"
+            ></iframe>
+          </div>
+          <div id="bracket-edit-pane" class="rules-pane">
+            <p class="muted rules-easy-intro">Edit bracket by assigning teams and winners. The preview shows the live stats page. Use &quot;Load from sync&quot; only when you want to pull the latest draft from the sync server (you'll be asked to confirm so you don't lose progress).</p>
+            <div class="rules-editor-toolbar">
+              <button type="button" class="secondary" id="bracket-load-sync-btn">Load from sync</button>
+              <button type="button" class="primary" id="bracket-submit-btn">Submit suggested changes</button>
+              <button type="button" class="secondary" id="bracket-save-draft-btn">Save draft</button>
+              <span class="master-only">
+                <button type="button" class="primary" id="bracket-publish-btn" title="Copy draft to live bracket (stats page uses this)">Publish to stats page</button>
+                <select id="bracket-suggestions-dropdown" class="rules-suggestions-dropdown" title="Pick a staff suggestion">
+                  <option value="">— Staff suggestions —</option>
+                </select>
+                <button type="button" class="secondary" id="bracket-load-selected-btn">Load selected</button>
+                <button type="button" class="secondary" id="bracket-refresh-suggestions-btn" title="Refresh list">Refresh list</button>
+                <button type="button" class="secondary" id="bracket-diff-btn">Show changes vs live</button>
+              </span>
+              <span id="bracket-editor-status" class="status"></span>
+            </div>
+            <div class="bracket-editor-layout">
+              <div class="bracket-teams-panel">
+                <h2 class="tournament-pane-subtitle">Teams</h2>
+                <p class="muted bracket-editor-tournament-hint">
+                  Uses the <strong>active tournament</strong> selected in the Tournament section. Change it there to edit a different bracket.
+                </p>
+                <div id="bracket-teams-list-wrap" class="bracket-teams-list-wrap">
+                  <ul id="bracket-teams-list" class="bracket-teams-list"></ul>
+                  <p id="bracket-teams-empty" class="muted bracket-teams-empty" style="display: none;">No teams. Add teams in Tournament → Draft board or Teams.</p>
+                </div>
+              </div>
+              <div class="bracket-grid-panel">
+                <div class="bracket-grid-header">
+                  <h2 class="tournament-pane-subtitle">Bracket editor</h2>
+                  <p class="muted">
+                    Assign teams to first-round slots and set winners; winners advance to the next round. Submit suggested changes for master to review, or Save draft to sync. Master can Publish to stats page to push the bracket live.
+                  </p>
+                </div>
+                <div id="bracket-editor-placeholder" class="bracket-grid-placeholder">
+                  <p class="muted">Select an active tournament in the Tournament section, then open Edit bracket to load teams and bracket.</p>
+                </div>
+                <div id="bracket-grid" class="bracket-grid" style="display: none;"></div>
+              </div>
+            </div>
+          </div>
+          <div id="bracket-diff-modal" class="rules-modal" hidden>
+            <div class="rules-modal-content rules-diff-modal-content">
+              <h2>Changes vs live bracket</h2>
+              <p class="muted">Green = added in suggestion, red = removed from live.</p>
+              <div id="bracket-diff-body" class="rules-diff-body"></div>
+              <div class="rules-modal-actions">
+                <button type="button" class="secondary" id="bracket-diff-close">Close</button>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -395,18 +492,6 @@
                   <button type="button" class="secondary" id="tournament-save-format-btn">Save format</button>
                   <button type="button" class="secondary" id="tournament-lock-format-btn">Lock format</button>
                   <span id="tournament-format-status" class="status"></span>
-                </div>
-                <div class="bracket-teams-section">
-                  <h3 class="tournament-pane-subtitle">Team names &amp; Discord roles</h3>
-                  <p class="muted">Set team names and optional Discord role IDs so when players are drafted to a team, the bot can assign the role and ping them.</p>
-                  <button type="button" class="secondary" id="tournament-add-team-btn">+ Add team</button>
-                  <div id="tournament-teams-list" class="tournament-teams-list"></div>
-                </div>
-                <div class="bracket-subs-section">
-                  <h3 class="tournament-pane-subtitle">Tournament subs (for replays &amp; stats)</h3>
-                  <p class="muted">Subs for the whole tournament. If they play in a replay they can be tracked on the stats page. You can add these after the tournament starts.</p>
-                  <button type="button" class="primary" id="tournament-add-sub-btn">+ Add tournament sub</button>
-                  <ul id="tournament-subs-list" class="tournament-subs-list"></ul>
                 </div>
               </div>
               <div id="tournament-locked-modal" class="tournament-modal" hidden>
@@ -578,6 +663,14 @@
                 <div class="draft-preset-teams-section">
                   <h3 class="tournament-pane-subtitle">Preset teams &amp; custom</h3>
                   <p class="muted">Add a saved preset to the draft in one click (saves typing and keeps role IDs). Or add a single custom team.</p>
+                  <div class="draft-salary-cap-row">
+                    <label class="field field-inline">
+                      <span class="field-label">Salary cap (for all teams)</span>
+                      <input type="number" id="tournament-draft-salary-cap-input" min="0" placeholder="e.g. 300" />
+                    </label>
+                    <button type="button" class="secondary" id="tournament-draft-salary-cap-save-btn">Update cap</button>
+                    <span id="tournament-draft-salary-cap-status" class="status"></span>
+                  </div>
                   <div class="draft-preset-toolbar">
                     <select id="tournament-draft-preset-select" class="tournament-select-inline">
                       <option value="">— Choose preset —</option>
@@ -671,6 +764,11 @@
                   <label class="field">
                     <span class="field-label">Preset name</span>
                     <input type="text" id="tournament-preset-edit-name" placeholder="e.g. Season 1 teams" />
+                  </label>
+                  <label class="field">
+                    <span class="field-label">Salary cap (optional)</span>
+                    <input type="number" id="tournament-preset-edit-salary-cap" min="0" placeholder="e.g. 300 for 3v3, 200 for 2v2" />
+                    <span class="field-hint">When you load this preset to the draft, the tournament&apos;s salary cap is set to this value. Leave blank to keep current cap.</span>
                   </label>
                   <label class="field">
                     <span class="field-label">Teams in this preset</span>

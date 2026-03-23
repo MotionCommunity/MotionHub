@@ -44,9 +44,8 @@ You need one place that serves the tournament sync (and notes). If you already d
 4. For each channel you use:
    - Right‑click the channel (e.g. #match-announcements) → **Copy channel ID**.
    - Use these for: **CHANNEL_MATCH_ANNOUNCE**, **CHANNEL_MATCH_RESULTS**, **CHANNEL_PROCESSING_QUEUE**, **CHANNEL_STAFF_CHAT**.
-5. For each role:
-   - **Server Settings → Roles** → right‑click a role → **Copy role ID**.
-   - Use these for: **ROLE_STAFF**, **ROLE_REGISTERED**, **ROLE_CHECKED_IN**.
+5. For staff role:
+   - **Server Settings → Roles** → right‑click the role → **Copy role ID** → **ROLE_STAFF**.
 
 ---
 
@@ -101,8 +100,6 @@ Then in Railway you’ll set the **Root Directory** to `MotionBot` so it only bu
 | `CHANNEL_PROCESSING_QUEUE` | Channel ID for processing queue |
 | `CHANNEL_STAFF_CHAT` | Channel ID for staff chat |
 | `ROLE_STAFF` | Staff role ID |
-| `ROLE_REGISTERED` | Registered player role ID |
-| `ROLE_CHECKED_IN` | Checked-in role ID |
 | **`TOURNAMENT_SYNC_URL`** | **Your Notes API URL from Step 1** (e.g. `https://your-project-xyz.vercel.app`) — **no trailing slash** |
 
 5. Save. Railway will rebuild and redeploy. Open **Deployments** → latest deployment → **View Logs**. You should see:

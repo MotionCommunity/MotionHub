@@ -1,0 +1,21 @@
+{
+  "name": "motion-league-platform",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:api": "npm run dev -w @motion/league-api",
+    "dev:worker": "npm run dev -w @motion/league-worker",
+    "build": "npm run build -ws --if-present",
+    "typecheck": "npm run typecheck -ws --if-present",
+    "db:generate": "npm run db:generate -w @motion/db",
+    "db:migrate": "npm run db:migrate -w @motion/db",
+    "db:push": "npm run db:push -w @motion/db"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2"
+  }
+}

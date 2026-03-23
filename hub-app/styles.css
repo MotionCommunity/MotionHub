@@ -229,7 +229,8 @@ button {
 }
 
 #section-rules.visible,
-#section-stats.visible {
+#section-stats.visible,
+#section-bracket.visible {
   display: flex;
   flex-direction: column;
   flex: 1;
@@ -1015,6 +1016,29 @@ button {
   margin: 0 0 10px;
 }
 
+.draft-salary-cap-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 8px 0;
+}
+
+.draft-salary-cap-row .field-inline {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.draft-salary-cap-row .field-label {
+  margin: 0;
+}
+
+.draft-salary-cap-row input[type="number"] {
+  width: 80px;
+}
+
 .draft-preset-toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -1431,9 +1455,16 @@ button {
   border: 1px solid var(--border-subtle);
 }
 
-.notes-sync-config .field {
+.notes-sync-config .field,
+.notes-sync-config .notes-sync-config-field {
   flex: 1;
   min-width: 200px;
+}
+
+.notes-sync-config-buttons {
+  display: flex;
+  gap: 8px;
+  align-items: center;
 }
 
 .field-hint {
@@ -1469,6 +1500,139 @@ button {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.bracket-editor-layout {
+  display: grid;
+  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: flex-start;
+  margin-top: 16px;
+}
+
+.bracket-teams-panel {
+  padding: 12px;
+  border-radius: var(--radius-lg);
+  background: rgba(6, 10, 24, 0.96);
+  border: 1px solid var(--border-subtle);
+}
+
+.bracket-grid-panel {
+  padding: 12px;
+  border-radius: var(--radius-lg);
+  background: rgba(6, 10, 24, 0.96);
+  border: 1px solid var(--border-subtle);
+  min-height: 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.bracket-grid-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.bracket-grid-placeholder {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  border-radius: var(--radius-md);
+  border: 1px dashed rgba(148, 163, 184, 0.5);
+  padding: 16px;
+}
+
+.bracket-grid-placeholder .muted {
+  max-width: 480px;
+}
+
+.bracket-teams-list-wrap {
+  margin-top: 8px;
+}
+
+.bracket-teams-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.bracket-team-item {
+  padding: 6px 10px;
+  border-radius: var(--radius-md);
+  background: rgba(6, 10, 24, 0.8);
+  border: 1px solid var(--border-subtle);
+  font-size: 0.9rem;
+}
+
+.bracket-teams-empty {
+  margin: 8px 0 0;
+  font-size: 0.85rem;
+}
+
+.bracket-editor-tournament-hint {
+  font-size: 0.85rem;
+  margin-bottom: 8px;
+}
+
+.bracket-editor-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.bracket-grid {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  margin-top: 12px;
+}
+
+.bracket-grid-column {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 200px;
+}
+
+.bracket-grid-round-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+.bracket-match-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border-radius: var(--radius-md);
+  background: rgba(6, 10, 24, 0.8);
+  border: 1px solid var(--border-subtle);
+}
+
+.bracket-match-slot {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.bracket-match-card select {
+  width: 100%;
+  padding: 6px 8px;
+  font-size: 0.85rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  background: #050712;
+  color: var(--text);
 }
 
 .field {
@@ -1638,6 +1802,25 @@ textarea:focus {
 }
 
 #stats-preview-pane.visible .rules-iframe {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+}
+
+/* Bracket section: same layout as rules/stats so preview fills the space */
+#bracket-preview-pane.visible {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+#bracket-preview-pane .rules-preview-toolbar {
+  flex-shrink: 0;
+  margin-bottom: 0.5rem;
+}
+
+#bracket-preview-pane.visible #bracket-preview-iframe {
   flex: 1;
   min-height: 0;
   height: 100%;

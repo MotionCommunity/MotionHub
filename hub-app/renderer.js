@@ -852,10 +852,11 @@ function setupTournamentApp() {
           const names = pre.teamIds
             ? (pre.teamIds.map((id) => archive.find((t) => t.id === id)?.name).filter(Boolean).join(', ') || '—')
             : (pre.teams && pre.teams.map((t) => t.name).filter(Boolean).join(', ')) || '—';
+          const capLabel = (pre.salaryCap != null && pre.salaryCap !== '') ? ` (cap ${pre.salaryCap})` : '';
           const div = document.createElement('div');
           div.className = 'teams-preset-item';
           div.innerHTML =
-            `<span class="preset-name">${escapeHtml(pre.name || 'Preset')}</span>` +
+            `<span class="preset-name">${escapeHtml(pre.name || 'Preset')}${escapeHtml(capLabel)}</span>` +
             `<span class="preset-teams-preview">${count ? `${count} teams: ${escapeHtml(names.length > 50 ? names.slice(0, 47) + '…' : names)}` : 'No teams'}</span>` +
             `<span><button type="button" class="primary tournament-preset-load-btn" data-preset-idx="${idx}">Load to draft</button> ` +
             `<button type="button" class="secondary tournament-preset-edit-btn" data-preset-idx="${idx}">Edit</button> ` +
@@ -956,6 +957,8 @@ function setupTournamentApp() {
     if (!pre) return;
     document.getElementById('tournament-preset-edit-index').value = String(index);
     document.getElementById('tournament-preset-edit-name').value = pre.name || '';
+    const capInput = document.getElementById('tournament-preset-edit-salary-cap');
+    if (capInput) capInput.value = (pre.salaryCap != null && pre.salaryCap !== '') ? String(pre.salaryCap) : '';
     const container = document.getElementById('tournament-preset-edit-teams');
     container.innerHTML = '';
     const legacyNames = new Set((pre.teams && pre.teams.map((t) => (t.name || '').toLowerCase())) || []);
@@ -977,6 +980,8 @@ function setupTournamentApp() {
     }
     document.getElementById('tournament-preset-edit-index').value = '-1';
     document.getElementById('tournament-preset-edit-name').value = '';
+    const capInput = document.getElementById('tournament-preset-edit-salary-cap');
+    if (capInput) capInput.value = '';
     const container = document.getElementById('tournament-preset-edit-teams');
     container.innerHTML = '';
     archive.forEach((team) => {
@@ -1016,6 +1021,12 @@ function setupTournamentApp() {
     if (added.length === 0) return;
     const merged = [...existing, ...added];
     await ipc.invoke('tournament:updateTeams', activeTournamentId, merged);
+    if (preset.salaryCap != null && preset.salaryCap !== '') {
+      const cap = parseInt(preset.salaryCap, 10);
+      if (!isNaN(cap) && cap >= 0) {
+        await ipc.invoke('tournament:updateSalaryCap', activeTournamentId, cap);
+      }
+    }
     await pushBracketConfigToSync();
     loadDraftPane();
   }
@@ -1077,11 +1088,14 @@ function setupTournamentApp() {
     }
 
     loadDraftPresetSelect();
+    const draftCapInput = document.getElementById('tournament-draft-salary-cap-input');
+    if (draftCapInput) draftCapInput.value = '';
     ipc.invoke('tournament:get', activeTournamentId).then((t) => {
       if (!t) return;
       const teamConfig = t.teamConfig || [];
       const teamSize = Number(t.teamSize) || 3;
       const salaryCap = Number(t.salaryCap) || 0;
+      if (draftCapInput) draftCapInput.value = salaryCap > 0 ? String(salaryCap) : '';
       Promise.all([
         ipc.invoke('players:getAll', { status: null, tournamentId: activeTournamentId }),
         ipc.invoke('players:getAll', { status: 'Approved' }),
@@ -2283,8 +2297,34 @@ function setupTournamentApp() {
     if (added.length === 0) return;
     const merged = [...existing, ...added];
     await ipc.invoke('tournament:updateTeams', activeTournamentId, merged);
+    if (preset.salaryCap != null && preset.salaryCap !== '') {
+      const cap = parseInt(preset.salaryCap, 10);
+      if (!isNaN(cap) && cap >= 0) {
+        await ipc.invoke('tournament:updateSalaryCap', activeTournamentId, cap);
+      }
+    }
     await pushBracketConfigToSync();
     loadDraftPane();
+  });
+  document.getElementById('tournament-draft-salary-cap-save-btn')?.addEventListener('click', async () => {
+    const capInput = document.getElementById('tournament-draft-salary-cap-input');
+    const statusEl = document.getElementById('tournament-draft-salary-cap-status');
+    if (!activeTournamentId || !capInput) return;
+    const raw = capInput.value.trim();
+    const cap = raw === '' ? 0 : parseInt(raw, 10);
+    if (raw !== '' && (isNaN(cap) || cap < 0)) {
+      if (statusEl) statusEl.textContent = 'Enter a number ≥ 0, or leave blank for no cap.';
+      return;
+    }
+    if (statusEl) statusEl.textContent = 'Updating…';
+    try {
+      await ipc.invoke('tournament:updateSalaryCap', activeTournamentId, cap);
+      loadDraftPane();
+      if (statusEl) statusEl.textContent = cap > 0 ? `Cap set to $${cap}.` : 'Cap cleared.';
+      if (window.toast) window.toast(cap > 0 ? `Salary cap set to $${cap}` : 'Salary cap cleared');
+    } catch (e) {
+      if (statusEl) statusEl.textContent = e.message || 'Update failed.';
+    }
   });
   document.getElementById('tournament-draft-save-preset-btn')?.addEventListener('click', async () => {
     if (!activeTournamentId) return;
@@ -2311,7 +2351,13 @@ function setupTournamentApp() {
     const selectEl = document.getElementById('tournament-draft-preset-select');
     const selectedIndex = selectEl ? parseInt(selectEl.value, 10) : -1;
     const selectedPreset = selectedIndex >= 0 && presets[selectedIndex] ? presets[selectedIndex] : null;
-    window._draftSavePresetPayload = { teamIds, teamCount: teamConfig.length, presetIndex: selectedIndex, presetName: selectedPreset ? selectedPreset.name : null };
+    window._draftSavePresetPayload = {
+      teamIds,
+      teamCount: teamConfig.length,
+      presetIndex: selectedIndex,
+      presetName: selectedPreset ? selectedPreset.name : null,
+      tournamentSalaryCap: t != null && t.salaryCap != null ? t.salaryCap : null,
+    };
     const countEl = document.getElementById('tournament-draft-save-preset-count');
     if (countEl) countEl.textContent = String(teamConfig.length);
     const overwriteBtn = document.getElementById('tournament-draft-save-preset-overwrite-btn');
@@ -2329,8 +2375,9 @@ function setupTournamentApp() {
     const payload = window._draftSavePresetPayload;
     if (!payload || payload.presetIndex == null || payload.presetIndex < 0) return;
     const name = payload.presetName || 'Preset';
-    if (!window.confirm(`Overwrite preset "${name}" with current ${payload.teamCount} team(s)? This will replace the preset's team list.`)) return;
-    await ipc.invoke('app:updateDraftTeamPreset', payload.presetIndex, { teamIds: payload.teamIds });
+    if (!window.confirm(`Overwrite preset "${name}" with current ${payload.teamCount} team(s)? This will replace the preset's team list and use the current tournament salary cap.`)) return;
+    const salaryCap = (payload.tournamentSalaryCap != null && payload.tournamentSalaryCap !== '') ? payload.tournamentSalaryCap : null;
+    await ipc.invoke('app:updateDraftTeamPreset', payload.presetIndex, { teamIds: payload.teamIds, salaryCap });
     document.getElementById('tournament-draft-save-preset-modal').hidden = true;
     if (window.alert) window.alert(`Preset "${name}" has been overwritten.`);
     loadDraftPresetSelect();
@@ -2353,7 +2400,8 @@ function setupTournamentApp() {
     const name = window.prompt('New preset name (will be saved as a new preset, not overwrite):', defaultName);
     if (name == null || !name.trim()) return;
     if (!window.confirm(`Create new preset "${name.trim()}" with ${payload.teamCount} team(s)? This will add a new preset and not change any existing one.`)) return;
-    await ipc.invoke('app:saveDraftTeamPreset', { name: name.trim(), teamIds: payload.teamIds });
+    const salaryCap = (payload.tournamentSalaryCap != null && payload.tournamentSalaryCap !== '') ? payload.tournamentSalaryCap : null;
+    await ipc.invoke('app:saveDraftTeamPreset', { name: name.trim(), teamIds: payload.teamIds, salaryCap });
     if (window.alert) window.alert(`Preset "${name.trim()}" has been created.`);
     loadDraftPresetSelect();
     loadTeamsPane();
@@ -2403,15 +2451,17 @@ function setupTournamentApp() {
   document.getElementById('tournament-preset-edit-save-btn')?.addEventListener('click', async () => {
     const indexInput = document.getElementById('tournament-preset-edit-index');
     const nameInput = document.getElementById('tournament-preset-edit-name');
+    const capInput = document.getElementById('tournament-preset-edit-salary-cap');
     const container = document.getElementById('tournament-preset-edit-teams');
     const index = parseInt(indexInput?.value ?? '-1', 10);
     const name = (nameInput?.value || '').trim();
+    const salaryCap = (capInput && capInput.value.trim() !== '') ? capInput.value.trim() : null;
     const teamIds = Array.from(container?.querySelectorAll('input[type=checkbox]:checked') || []).map((cb) => cb.value).filter(Boolean);
     if (!name) return;
     if (index >= 0) {
-      await ipc.invoke('app:updateDraftTeamPreset', index, { name, teamIds });
+      await ipc.invoke('app:updateDraftTeamPreset', index, { name, teamIds, salaryCap });
     } else {
-      await ipc.invoke('app:saveDraftTeamPreset', { name, teamIds });
+      await ipc.invoke('app:saveDraftTeamPreset', { name, teamIds, salaryCap });
     }
     document.getElementById('tournament-preset-edit-modal').hidden = true;
     loadTeamsPane();
@@ -3901,6 +3951,7 @@ function setupStatsEditor() {
       if (paneSource) paneSource.classList.toggle('visible', tab === 'source');
       if (tab === 'edit') {
         updateStatsPreview(); // show preview immediately when switching to Easy Edit
+        refreshStatsSuggestionsList(); // populate Staff suggestions dropdown
       }
     });
   });
@@ -3978,6 +4029,77 @@ function setupStatsEditor() {
     });
   }
 
+  const statsSuggestionsDropdown = document.getElementById('stats-suggestions-dropdown');
+  const statsLoadSelectedBtn = document.getElementById('stats-load-selected-btn');
+  const statsRefreshSuggestionsBtn = document.getElementById('stats-refresh-suggestions-btn');
+  const statsDiffBtn = document.getElementById('stats-diff-btn');
+  const statsDiffModal = document.getElementById('stats-diff-modal');
+  const statsDiffBody = document.getElementById('stats-diff-body');
+  const statsDiffCloseBtn = document.getElementById('stats-diff-close');
+
+  let _statsSuggestionsItems = [];
+
+  function formatStatsSuggestionLabel(item) {
+    if (!item) return '';
+    const d = item.submittedAt ? new Date(item.submittedAt) : null;
+    const dateStr = d ? d.toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' }) : 'Unknown date';
+    return item.submittedBy ? `${dateStr} – ${item.submittedBy}` : dateStr;
+  }
+
+  async function refreshStatsSuggestionsList() {
+    const ipc = getIpc();
+    if (!ipc) return;
+    const result = await ipc.invoke('notes:fetchSuggestedStats');
+    if (!result.ok || !Array.isArray(result.items)) {
+      _statsSuggestionsItems = [];
+      if (statsSuggestionsDropdown) {
+        statsSuggestionsDropdown.innerHTML = '<option value="">— Staff suggestions —</option>';
+      }
+      return;
+    }
+    _statsSuggestionsItems = result.items;
+    if (statsSuggestionsDropdown) {
+      statsSuggestionsDropdown.innerHTML = '<option value="">— Staff suggestions —</option>';
+      _statsSuggestionsItems.forEach((item) => {
+        const opt = document.createElement('option');
+        opt.value = item.id || '';
+        opt.textContent = formatStatsSuggestionLabel(item);
+        statsSuggestionsDropdown.appendChild(opt);
+      });
+    }
+  }
+
+  function statsLineDiff(liveHtml, suggestedHtml) {
+    const a = (liveHtml || '').split(/\r?\n/);
+    const b = (suggestedHtml || '').split(/\r?\n/);
+    const out = [];
+    const n = a.length;
+    const m = b.length;
+    const dp = Array(n + 1).fill(null).map(() => Array(m + 1).fill(0));
+    for (let i = 1; i <= n; i++) {
+      for (let j = 1; j <= m; j++) {
+        if (a[i - 1] === b[j - 1]) dp[i][j] = dp[i - 1][j - 1] + 1;
+        else dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+      }
+    }
+    let i = n, j = m;
+    const seq = [];
+    while (i > 0 || j > 0) {
+      if (i > 0 && j > 0 && a[i - 1] === b[j - 1]) {
+        seq.push({ type: 'common', line: a[i - 1] });
+        i--; j--;
+      } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
+        seq.push({ type: 'add', line: b[j - 1] });
+        j--;
+      } else {
+        seq.push({ type: 'remove', line: a[i - 1] });
+        i--;
+      }
+    }
+    seq.reverse();
+    return seq;
+  }
+
   const statsSubmitBtn = document.getElementById('stats-submit-btn');
   if (statsSubmitBtn) {
     statsSubmitBtn.addEventListener('click', async () => {
@@ -3994,7 +4116,8 @@ function setupStatsEditor() {
         const leaderboardsHtml = (StatsEditorAPI.renderStatsLeaderboards && model.leaderboards) ? StatsEditorAPI.renderStatsLeaderboards(model.leaderboards) : null;
         const footerHtml = (StatsEditorAPI.renderStatsFooter && model.footer) ? StatsEditorAPI.renderStatsFooter(model.footer) : null;
         const newContent = buildStatsContentFromEdits(statsFullContent, heroHtml, upcomingHtml, highlightsHtml, leaderboardsHtml, footerHtml, statsParsed);
-        const result = await ipc.invoke('notes:submitSuggestedStats', newContent);
+        const submittedBy = await ipc.invoke('app:getStaffHandle').catch(() => '');
+        const result = await ipc.invoke('notes:submitSuggestedStats', { html: newContent, submittedBy: (submittedBy && String(submittedBy).trim()) || '' });
         setStatus(result.ok ? 'Suggested changes submitted. Master can review and publish.' : (result.error || 'Submit failed'), !result.ok);
       } catch (err) {
         setStatus(err.message || 'Submit failed', true);
@@ -4002,17 +4125,30 @@ function setupStatsEditor() {
     });
   }
 
-  const statsLoadSuggestedBtn = document.getElementById('stats-load-suggested-btn');
-  if (statsLoadSuggestedBtn) {
-    statsLoadSuggestedBtn.addEventListener('click', async () => {
+  if (statsLoadSelectedBtn) {
+    statsLoadSelectedBtn.addEventListener('click', async () => {
       const ipc = getIpc();
       if (!ipc) return setStatus('Not available.', true);
-      setStatus('Loading…');
+      if (statsFullContent && !window.confirm('Load staff suggestion? This will replace your current edits.')) return;
+      const selectedId = statsSuggestionsDropdown && statsSuggestionsDropdown.value;
+      let html = null;
+      if (selectedId && _statsSuggestionsItems.length) {
+        const item = _statsSuggestionsItems.find((s) => s.id === selectedId);
+        if (item) html = item.html;
+      }
+      if (!html) {
+        setStatus('Refreshing list…');
+        await refreshStatsSuggestionsList();
+        if (_statsSuggestionsItems.length) {
+          html = _statsSuggestionsItems[0].html;
+          if (statsSuggestionsDropdown) statsSuggestionsDropdown.value = _statsSuggestionsItems[0].id || '';
+        }
+      }
+      if (!html) return setStatus('No suggestion selected. Pick one from the dropdown or refresh the list.', true);
+      setStatus('Loading staff suggestion…');
       try {
-        const result = await ipc.invoke('notes:fetchSuggestedStats');
-        if (!result.ok || !result.html) return setStatus(result.error || 'No suggestion found.', true);
-        statsFullContent = result.html;
-        statsParsed = parseStatsEditableRegions(result.html);
+        statsFullContent = html;
+        statsParsed = parseStatsEditableRegions(html);
         updateStatsEditorSectionVisibility(statsParsed);
         const model = (typeof StatsEditorAPI !== 'undefined' && StatsEditorAPI.parseStatsFromRegions)
           ? StatsEditorAPI.parseStatsFromRegions(statsParsed.hero || '', statsParsed.upcoming || '', statsParsed.highlights || '', statsParsed.leaderboards || '', statsParsed.footer || '')
@@ -4024,6 +4160,65 @@ function setupStatsEditor() {
         setStatus(err.message || 'Load failed', true);
       }
     });
+  }
+
+  if (statsRefreshSuggestionsBtn) {
+    statsRefreshSuggestionsBtn.addEventListener('click', async () => {
+      setStatus('Refreshing suggestions…');
+      await refreshStatsSuggestionsList();
+      setStatus(_statsSuggestionsItems.length ? `Loaded ${_statsSuggestionsItems.length} suggestion(s). Pick one and click Load selected.` : 'No staff suggestions yet.');
+    });
+  }
+
+  if (statsDiffBtn) {
+    statsDiffBtn.addEventListener('click', async () => {
+      const ipc = getIpc();
+      if (!ipc) return setStatus('Not available.', true);
+      let suggestedHtml = null;
+      const selectedId = statsSuggestionsDropdown && statsSuggestionsDropdown.value;
+      if (selectedId && _statsSuggestionsItems.length) {
+        const item = _statsSuggestionsItems.find((s) => s.id === selectedId);
+        if (item) suggestedHtml = item.html;
+      }
+      if (!suggestedHtml && statsFullContent) {
+        if (statsParsed && typeof StatsEditorAPI !== 'undefined' && StatsEditorAPI.renderStatsHero) {
+          const model = collectStatsModelFromEditor();
+          const heroHtml = StatsEditorAPI.renderStatsHero(model.hero);
+          const upcomingHtml = StatsEditorAPI.renderStatsUpcoming(model.upcoming);
+          const highlightsHtml = (StatsEditorAPI.renderStatsHighlights && model.highlights) ? StatsEditorAPI.renderStatsHighlights(model.highlights) : null;
+          const leaderboardsHtml = (StatsEditorAPI.renderStatsLeaderboards && model.leaderboards) ? StatsEditorAPI.renderStatsLeaderboards(model.leaderboards) : null;
+          const footerHtml = (StatsEditorAPI.renderStatsFooter && model.footer) ? StatsEditorAPI.renderStatsFooter(model.footer) : null;
+          suggestedHtml = buildStatsContentFromEdits(statsFullContent, heroHtml, upcomingHtml, highlightsHtml, leaderboardsHtml, footerHtml, statsParsed);
+        } else {
+          suggestedHtml = statsFullContent;
+        }
+      }
+      if (!suggestedHtml) return setStatus('Load a suggestion first or select one from the dropdown.', true);
+      setStatus('Loading live stats for comparison…');
+      try {
+        const { content: liveHtml } = await ipc.invoke('github:getStatsFile');
+        const seq = statsLineDiff(liveHtml || '', suggestedHtml);
+        if (!statsDiffBody) return;
+        statsDiffBody.innerHTML = '';
+        seq.forEach(({ type, line }) => {
+          const div = document.createElement('div');
+          div.className = 'diff-line diff-' + (type === 'add' ? 'add' : type === 'remove' ? 'remove' : 'common');
+          div.textContent = (type === 'add' ? '+ ' : type === 'remove' ? '- ' : '  ') + (line || '');
+          statsDiffBody.appendChild(div);
+        });
+        if (statsDiffModal) statsDiffModal.hidden = false;
+        setStatus('');
+      } catch (e) {
+        setStatus(e.message || 'Failed to load live stats.', true);
+      }
+    });
+  }
+
+  if (statsDiffCloseBtn && statsDiffModal) {
+    statsDiffCloseBtn.addEventListener('click', () => { statsDiffModal.hidden = true; });
+  }
+  if (statsDiffModal) {
+    statsDiffModal.addEventListener('click', (e) => { if (e.target === statsDiffModal) statsDiffModal.hidden = true; });
   }
 
   if (publishBtn) {
@@ -4160,6 +4355,546 @@ function setupStatsEditor() {
   autoLoadStatsFromGitHub();
 }
 
+function setupBracketSection() {
+  const ipc = getIpc();
+  const tabPreview = document.querySelector('.bracket-tab[data-bracket-tab="preview"]');
+  const tabEdit = document.querySelector('.bracket-tab[data-bracket-tab="edit"]');
+  const panePreview = document.getElementById('bracket-preview-pane');
+  const paneEdit = document.getElementById('bracket-edit-pane');
+  const refreshBtn = document.getElementById('bracket-preview-refresh-btn');
+  const iframe = document.getElementById('bracket-preview-iframe');
+  const statusEl = document.getElementById('bracket-preview-status');
+  const editorStatusEl = document.getElementById('bracket-editor-status');
+  const saveDraftBtn = document.getElementById('bracket-save-draft-btn');
+  const bracketLoadSyncBtn = document.getElementById('bracket-load-sync-btn');
+  const bracketSuggestionsDropdown = document.getElementById('bracket-suggestions-dropdown');
+  const bracketLoadSelectedBtn = document.getElementById('bracket-load-selected-btn');
+  const bracketRefreshSuggestionsBtn = document.getElementById('bracket-refresh-suggestions-btn');
+  const bracketDiffBtn = document.getElementById('bracket-diff-btn');
+  const bracketDiffModal = document.getElementById('bracket-diff-modal');
+  const bracketDiffBody = document.getElementById('bracket-diff-body');
+  const bracketDiffCloseBtn = document.getElementById('bracket-diff-close');
+  if (!tabPreview || !tabEdit || !panePreview || !paneEdit) return;
+
+  let _bracketSuggestionsItems = [];
+
+  function formatBracketSuggestionLabel(item) {
+    if (!item) return '';
+    const d = item.submittedAt ? new Date(item.submittedAt) : null;
+    const dateStr = d ? d.toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' }) : 'Unknown date';
+    return item.submittedBy ? `${dateStr} – ${item.submittedBy}` : dateStr;
+  }
+
+  async function refreshBracketSuggestionsList() {
+    if (!ipc) return;
+    const result = await ipc.invoke('notes:fetchSuggestedBracket');
+    if (!result.ok || !Array.isArray(result.items)) {
+      _bracketSuggestionsItems = [];
+      if (bracketSuggestionsDropdown) {
+        bracketSuggestionsDropdown.innerHTML = '<option value="">— Staff suggestions —</option>';
+      }
+      return;
+    }
+    _bracketSuggestionsItems = result.items;
+    if (bracketSuggestionsDropdown) {
+      bracketSuggestionsDropdown.innerHTML = '<option value="">— Staff suggestions —</option>';
+      _bracketSuggestionsItems.forEach((item) => {
+        const opt = document.createElement('option');
+        opt.value = item.id || '';
+        opt.textContent = formatBracketSuggestionLabel(item);
+        bracketSuggestionsDropdown.appendChild(opt);
+      });
+    }
+  }
+
+  function bracketToLines(draftOrConfig) {
+    const lines = [];
+    if (!draftOrConfig || !Array.isArray(draftOrConfig.rounds)) return lines;
+    draftOrConfig.rounds.forEach((round) => {
+      lines.push((round.name || `Round ${(round.order || 0) + 1}`).trim() || 'Round');
+      (round.matches || []).forEach((m) => {
+        const a = m.teamA || 'TBD';
+        const b = m.teamB || 'TBD';
+        const w = m.winner ? ` (winner: ${m.winner})` : '';
+        lines.push(`  ${m.slot || m.matchId || ''}: ${a} vs ${b}${w}`);
+      });
+    });
+    return lines;
+  }
+
+  function bracketLineDiff(liveLines, suggestedLines) {
+    const a = liveLines || [];
+    const b = suggestedLines || [];
+    const n = a.length;
+    const m = b.length;
+    const dp = Array(n + 1).fill(null).map(() => Array(m + 1).fill(0));
+    for (let i = 1; i <= n; i++) {
+      for (let j = 1; j <= m; j++) {
+        if (a[i - 1] === b[j - 1]) dp[i][j] = dp[i - 1][j - 1] + 1;
+        else dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+      }
+    }
+    let i = n, j = m;
+    const seq = [];
+    while (i > 0 || j > 0) {
+      if (i > 0 && j > 0 && a[i - 1] === b[j - 1]) {
+        seq.push({ type: 'common', line: a[i - 1] });
+        i--; j--;
+      } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
+        seq.push({ type: 'add', line: b[j - 1] });
+        j--;
+      } else {
+        seq.push({ type: 'remove', line: a[i - 1] });
+        i--;
+      }
+    }
+    seq.reverse();
+    return seq;
+  }
+
+  function escapeHtml(s) {
+    if (s == null) return '';
+    const div = document.createElement('div');
+    div.textContent = String(s);
+    return div.innerHTML;
+  }
+
+  function setBracketTab(which) {
+    const isPreview = which === 'preview';
+    tabPreview.classList.toggle('active', isPreview);
+    tabEdit.classList.toggle('active', !isPreview);
+    panePreview.classList.toggle('visible', isPreview);
+    paneEdit.classList.toggle('visible', !isPreview);
+  }
+
+  function setStatus(msg, isError) {
+    if (!statusEl) return;
+    statusEl.textContent = msg || '';
+    statusEl.style.color = isError ? '#f87171' : '';
+  }
+
+  function setEditorStatus(msg, isError) {
+    if (!editorStatusEl) return;
+    editorStatusEl.textContent = msg || '';
+    editorStatusEl.style.color = isError ? '#f87171' : '';
+  }
+
+  function getActiveTournamentId() {
+    const sel = document.getElementById('tournament-select');
+    const v = sel && sel.value;
+    if (!v) return null;
+    const id = parseInt(v, 10);
+    return isNaN(id) ? null : id;
+  }
+
+  /** Build default single-elim rounds: N teams -> ceil(log2(N)) rounds, first round has 2^(k-1) matches. */
+  function buildDefaultRounds(teamCount, bracketType) {
+    const count = Math.max(0, parseInt(teamCount, 10) || 0);
+    if (count === 0) return [{ roundId: 'r1', name: 'Round 1', order: 0, matches: [{ matchId: 'r1-m1', slot: '1', teamA: null, teamB: null, winner: null }] }];
+    const size = Math.pow(2, Math.ceil(Math.log2(Math.max(2, count))));
+    const numRounds = Math.max(1, Math.ceil(Math.log2(size)));
+    const rounds = [];
+    const roundNames = ['Round 1', 'Round 2', 'Semi-finals', 'Finals'];
+    for (let r = 0; r < numRounds; r++) {
+      const numMatches = Math.pow(2, numRounds - 1 - r);
+      const matches = [];
+      for (let m = 0; m < numMatches; m++) {
+        matches.push({
+          matchId: `r${r + 1}-m${m + 1}`,
+          slot: String(m + 1),
+          teamA: null,
+          teamB: null,
+          winner: null,
+        });
+      }
+      rounds.push({
+        roundId: `r${r + 1}`,
+        name: roundNames[r] || `Round ${r + 1}`,
+        order: r,
+        matches,
+      });
+    }
+    return rounds;
+  }
+
+  /** In-memory draft state; updated when user edits, then sent on Save. */
+  let bracketDraftState = null;
+
+  function loadBracketPreview() {
+    if (!iframe) return;
+    try {
+      iframe.src = 'https://motioncommunity.github.io/stats/';
+      setStatus('', false);
+    } catch (e) {
+      setStatus(e.message || 'Could not load preview.', true);
+    }
+  }
+
+  function renderTeamsList(teamConfig) {
+    const listEl = document.getElementById('bracket-teams-list');
+    const emptyEl = document.getElementById('bracket-teams-empty');
+    if (!listEl) return;
+    listEl.innerHTML = '';
+    const teams = Array.isArray(teamConfig) ? teamConfig : [];
+    if (teams.length === 0) {
+      if (emptyEl) emptyEl.style.display = '';
+      return;
+    }
+    if (emptyEl) emptyEl.style.display = 'none';
+    teams.forEach((t) => {
+      const li = document.createElement('li');
+      li.className = 'bracket-team-item';
+      li.textContent = t.name || 'Team';
+      listEl.appendChild(li);
+    });
+  }
+
+  function collectDraftFromGrid() {
+    if (!bracketDraftState || !bracketDraftState.rounds) return bracketDraftState;
+    const grid = document.getElementById('bracket-grid');
+    if (!grid) return bracketDraftState;
+    const rounds = bracketDraftState.rounds.map((round) => ({
+      ...round,
+      matches: round.matches.map((match) => {
+        const wrap = grid.querySelector(`[data-match-id="${(match.matchId || '').replace(/"/g, '\\"')}"]`);
+        if (!wrap) return match;
+        const teamASel = wrap.querySelector('.bracket-match-team-a');
+        const teamBSel = wrap.querySelector('.bracket-match-team-b');
+        const winnerSel = wrap.querySelector('.bracket-match-winner');
+        return {
+          ...match,
+          teamA: teamASel && teamASel.value ? teamASel.value : match.teamA,
+          teamB: teamBSel && teamBSel.value ? teamBSel.value : match.teamB,
+          winner: winnerSel && winnerSel.value ? winnerSel.value : match.winner,
+        };
+      }),
+    }));
+    return { ...bracketDraftState, rounds };
+  }
+
+  function renderBracketGrid(draft, teamNames) {
+    const placeholder = document.getElementById('bracket-editor-placeholder');
+    const gridEl = document.getElementById('bracket-grid');
+    if (!gridEl) return;
+    if (!draft || !Array.isArray(draft.rounds) || draft.rounds.length === 0) {
+      if (placeholder) placeholder.style.display = '';
+      gridEl.style.display = 'none';
+      return;
+    }
+    if (placeholder) placeholder.style.display = 'none';
+    gridEl.style.display = '';
+    gridEl.innerHTML = '';
+    const teams = Array.isArray(teamNames) ? teamNames : [];
+    const emptyOpt = '<option value="">—</option>';
+    draft.rounds.forEach((round) => {
+      const col = document.createElement('div');
+      col.className = 'bracket-grid-column';
+      const title = document.createElement('div');
+      title.className = 'bracket-grid-round-title';
+      title.textContent = round.name || `Round ${round.order + 1}`;
+      col.appendChild(title);
+      (round.matches || []).forEach((match) => {
+        const card = document.createElement('div');
+        card.className = 'bracket-match-card';
+        card.dataset.matchId = match.matchId;
+        const teamA = document.createElement('select');
+        teamA.className = 'bracket-match-team-a';
+        teamA.innerHTML = emptyOpt + teams.map((n) => `<option value="${escapeHtml(n)}"${match.teamA === n ? ' selected' : ''}>${escapeHtml(n)}</option>`).join('');
+        const teamB = document.createElement('select');
+        teamB.className = 'bracket-match-team-b';
+        teamB.innerHTML = emptyOpt + teams.map((n) => `<option value="${escapeHtml(n)}"${match.teamB === n ? ' selected' : ''}>${escapeHtml(n)}</option>`).join('');
+        const winner = document.createElement('select');
+        winner.className = 'bracket-match-winner';
+        winner.innerHTML = '<option value="">—</option><option value="A"' + (match.winner === 'A' ? ' selected' : '') + '>A wins</option><option value="B"' + (match.winner === 'B' ? ' selected' : '') + '>B wins</option>';
+        const label = document.createElement('span');
+        label.className = 'bracket-match-slot';
+        label.textContent = match.slot || match.matchId;
+        card.append(label, teamA, teamB, winner);
+        col.appendChild(card);
+      });
+      gridEl.appendChild(col);
+    });
+  }
+
+  async function loadBracketEditor() {
+    const placeholder = document.getElementById('bracket-editor-placeholder');
+    const gridEl = document.getElementById('bracket-grid');
+    const teamsListWrap = document.getElementById('bracket-teams-list-wrap');
+    if (!placeholder || !gridEl) return;
+
+    const tournamentId = getActiveTournamentId();
+    if (!tournamentId || !ipc) {
+      gridEl.style.display = 'none';
+      if (placeholder) {
+        placeholder.style.display = '';
+        placeholder.querySelector('p') && (placeholder.querySelector('p').textContent = 'Select an active tournament in the Tournament section, then open Edit bracket to load teams and bracket.');
+      }
+      if (teamsListWrap) {
+        const listEl = document.getElementById('bracket-teams-list');
+        if (listEl) listEl.innerHTML = '';
+        const emptyEl = document.getElementById('bracket-teams-empty');
+        if (emptyEl) { emptyEl.style.display = ''; emptyEl.textContent = 'Select an active tournament to see teams.'; }
+      }
+      bracketDraftState = null;
+      return;
+    }
+
+    setEditorStatus('Loading…', false);
+    try {
+      const [tournament, syncResult] = await Promise.all([
+        ipc.invoke('tournament:get', tournamentId),
+        ipc.invoke('tournamentSync:fetch'),
+      ]);
+      if (!tournament) {
+        setEditorStatus('Tournament not found.', true);
+        return;
+      }
+      const teamConfig = tournament.teamConfig || [];
+      const teamNames = teamConfig.map((t) => t.name).filter(Boolean);
+      const bracketType = tournament.bracketType || 'SingleElimination';
+
+      renderTeamsList(teamConfig);
+
+      let draft = (syncResult.ok && syncResult.data && syncResult.data.bracketDraft) ? syncResult.data.bracketDraft : null;
+      const sameTournament = draft && draft.tournamentId === tournamentId;
+      const hasRounds = draft && Array.isArray(draft.rounds) && draft.rounds.length > 0;
+      if (!sameTournament || !hasRounds) {
+        draft = {
+          tournamentId,
+          updatedAt: new Date().toISOString(),
+          rounds: buildDefaultRounds(teamNames.length, bracketType),
+        };
+      }
+      bracketDraftState = draft;
+      renderBracketGrid(draft, teamNames);
+      setEditorStatus(`Loaded ${teamNames.length} teams, ${draft.rounds.length} round(s).`, false);
+    } catch (e) {
+      setEditorStatus(e.message || 'Load failed.', true);
+      bracketDraftState = null;
+    }
+  }
+
+  async function saveBracketDraft() {
+    const tournamentId = getActiveTournamentId();
+    if (!tournamentId || !ipc) {
+      setEditorStatus('No tournament selected.', true);
+      return;
+    }
+    const draft = collectDraftFromGrid();
+    if (!draft || !draft.rounds) {
+      setEditorStatus('Nothing to save. Load the bracket first.', true);
+      return;
+    }
+    setEditorStatus('Saving…', false);
+    try {
+      const fetchResult = await ipc.invoke('tournamentSync:fetch');
+      if (!fetchResult.ok || !fetchResult.data) {
+        setEditorStatus(fetchResult.error || 'Could not fetch current state.', true);
+        return;
+      }
+      const handle = await ipc.invoke('app:getStaffHandle');
+      const by = (handle && String(handle).trim()) || 'Staff';
+      const payload = {
+        ...fetchResult.data,
+        bracketDraft: { ...draft, tournamentId, updatedAt: new Date().toISOString() },
+        recentChanges: {
+          ...(fetchResult.data.recentChanges || {}),
+          'tournament-bracket': { by, at: new Date().toISOString() },
+        },
+        lastUpdated: new Date().toISOString(),
+      };
+      const result = await ipc.invoke('tournamentSync:update', payload);
+      if (result && result.ok) {
+        bracketDraftState = payload.bracketDraft;
+        setEditorStatus('Draft saved. Master hub can publish to the live stats page.', false);
+        if (window.toast) window.toast('Bracket draft saved.');
+      } else {
+        setEditorStatus(result && result.error ? result.error : 'Save failed.', true);
+      }
+    } catch (e) {
+      setEditorStatus(e.message || 'Save failed.', true);
+    }
+  }
+
+  async function publishBracketToStats() {
+    const draft = collectDraftFromGrid();
+    if (!draft || !draft.rounds) {
+      setEditorStatus('Nothing to publish. Load the bracket and save a draft first.', true);
+      return;
+    }
+    const tournamentId = getActiveTournamentId();
+    let tournament = null;
+    if (tournamentId) {
+      try {
+        tournament = await ipc.invoke('tournament:get', tournamentId);
+      } catch (_) {}
+    }
+    setEditorStatus('Publishing…', false);
+    try {
+      const fetchResult = await ipc.invoke('tournamentSync:fetch');
+      if (!fetchResult.ok || !fetchResult.data) {
+        setEditorStatus(fetchResult.error || 'Could not fetch current state.', true);
+        return;
+      }
+      const handle = await ipc.invoke('app:getStaffHandle');
+      const by = (handle && String(handle).trim()) || 'Staff';
+      const teamCount = (tournament && tournament.teamConfig && tournament.teamConfig.length) || 0;
+      const bracketConfig = {
+        ...draft,
+        tournamentName: (tournament && tournament.name) || null,
+        bracketType: (tournament && tournament.bracketType) || null,
+        seriesFormat: (tournament && tournament.seriesFormat) || null,
+        teamCount,
+        updatedAt: new Date().toISOString(),
+      };
+      const payload = {
+        ...fetchResult.data,
+        bracketConfig,
+        recentChanges: {
+          ...(fetchResult.data.recentChanges || {}),
+          'tournament-bracket': { by, at: new Date().toISOString() },
+        },
+        lastUpdated: new Date().toISOString(),
+      };
+      const result = await ipc.invoke('tournamentSync:update', payload);
+      if (result && result.ok) {
+        setEditorStatus('Published. Stats page will show bracket and tournament info.', false);
+        if (window.toast) window.toast('Bracket published to stats page.');
+      } else {
+        setEditorStatus(result && result.error ? result.error : 'Publish failed.', true);
+      }
+    } catch (e) {
+      setEditorStatus(e.message || 'Publish failed.', true);
+    }
+  }
+
+  if (bracketLoadSyncBtn) {
+    bracketLoadSyncBtn.addEventListener('click', () => {
+      if (bracketDraftState && bracketDraftState.rounds && bracketDraftState.rounds.length && !window.confirm('Load from sync? This will replace your current bracket draft.')) return;
+      loadBracketEditor();
+    });
+  }
+
+  const bracketSubmitBtn = document.getElementById('bracket-submit-btn');
+  if (bracketSubmitBtn) {
+    bracketSubmitBtn.addEventListener('click', async () => {
+      if (!ipc) return setEditorStatus('Not available.', true);
+      const draft = collectDraftFromGrid();
+      if (!draft || !draft.rounds) return setEditorStatus('Load bracket first, then edit and Submit.', true);
+      const tournamentId = getActiveTournamentId();
+      const submittedBy = await ipc.invoke('app:getStaffHandle').catch(() => '');
+      setEditorStatus('Submitting…', false);
+      try {
+        const result = await ipc.invoke('notes:submitSuggestedBracket', {
+          bracketDraft: { ...draft, tournamentId: tournamentId || undefined, updatedAt: new Date().toISOString() },
+          submittedBy: (submittedBy && String(submittedBy).trim()) || '',
+        });
+        setEditorStatus(result.ok ? 'Suggested changes submitted. Master can review and publish.' : (result.error || 'Submit failed'), !result.ok);
+      } catch (e) {
+        setEditorStatus(e.message || 'Submit failed', true);
+      }
+    });
+  }
+
+  if (bracketLoadSelectedBtn) {
+    bracketLoadSelectedBtn.addEventListener('click', async () => {
+      if (!ipc) return setEditorStatus('Not available.', true);
+      if (bracketDraftState && bracketDraftState.rounds && bracketDraftState.rounds.length && !window.confirm('Load staff suggestion? This will replace your current draft.')) return;
+      const selectedId = bracketSuggestionsDropdown && bracketSuggestionsDropdown.value;
+      let draft = null;
+      if (selectedId && _bracketSuggestionsItems.length) {
+        const item = _bracketSuggestionsItems.find((s) => s.id === selectedId);
+        if (item && item.bracketDraft) draft = item.bracketDraft;
+      }
+      if (!draft || !draft.rounds) {
+        setEditorStatus('Refreshing list…', false);
+        await refreshBracketSuggestionsList();
+        if (_bracketSuggestionsItems.length && _bracketSuggestionsItems[0].bracketDraft) {
+          draft = _bracketSuggestionsItems[0].bracketDraft;
+          if (bracketSuggestionsDropdown) bracketSuggestionsDropdown.value = _bracketSuggestionsItems[0].id || '';
+        }
+      }
+      if (!draft || !draft.rounds || !draft.rounds.length) return setEditorStatus('No suggestion selected. Pick one from the dropdown or refresh the list.', true);
+      const teamNames = [];
+      const seen = new Set();
+      (draft.rounds || []).forEach((r) => (r.matches || []).forEach((m) => {
+        if (m.teamA && !seen.has(m.teamA)) { seen.add(m.teamA); teamNames.push(m.teamA); }
+        if (m.teamB && !seen.has(m.teamB)) { seen.add(m.teamB); teamNames.push(m.teamB); }
+      }));
+      teamNames.sort();
+      bracketDraftState = draft;
+      renderTeamsList(teamNames.map((n) => ({ name: n })));
+      renderBracketGrid(draft, teamNames);
+      setEditorStatus('Loaded staff suggestion. Review and click Publish to make it live.');
+    });
+  }
+
+  if (bracketRefreshSuggestionsBtn) {
+    bracketRefreshSuggestionsBtn.addEventListener('click', async () => {
+      setEditorStatus('Refreshing suggestions…', false);
+      await refreshBracketSuggestionsList();
+      setEditorStatus(_bracketSuggestionsItems.length ? `Loaded ${_bracketSuggestionsItems.length} suggestion(s). Pick one and click Load selected.` : 'No staff suggestions yet.');
+    });
+  }
+
+  if (bracketDiffBtn) {
+    bracketDiffBtn.addEventListener('click', async () => {
+      if (!ipc) return setEditorStatus('Not available.', true);
+      let suggested = null;
+      const selectedId = bracketSuggestionsDropdown && bracketSuggestionsDropdown.value;
+      if (selectedId && _bracketSuggestionsItems.length) {
+        const item = _bracketSuggestionsItems.find((s) => s.id === selectedId);
+        if (item && item.bracketDraft) suggested = item.bracketDraft;
+      }
+      if (!suggested) suggested = collectDraftFromGrid();
+      if (!suggested || !suggested.rounds) return setEditorStatus('Load a suggestion first or select one from the dropdown.', true);
+      setEditorStatus('Loading live bracket for comparison…', false);
+      try {
+        const syncResult = await ipc.invoke('tournamentSync:fetch');
+        const live = (syncResult.ok && syncResult.data && syncResult.data.bracketConfig) ? syncResult.data.bracketConfig : null;
+        const liveLines = bracketToLines(live);
+        const suggestedLines = bracketToLines(suggested);
+        const seq = bracketLineDiff(liveLines, suggestedLines);
+        if (!bracketDiffBody) return;
+        bracketDiffBody.innerHTML = '';
+        seq.forEach(({ type, line }) => {
+          const div = document.createElement('div');
+          div.className = 'diff-line diff-' + (type === 'add' ? 'add' : type === 'remove' ? 'remove' : 'common');
+          div.textContent = (type === 'add' ? '+ ' : type === 'remove' ? '- ' : '  ') + (line || '');
+          bracketDiffBody.appendChild(div);
+        });
+        if (bracketDiffModal) bracketDiffModal.hidden = false;
+        setEditorStatus('');
+      } catch (e) {
+        setEditorStatus(e.message || 'Failed to load live bracket.', true);
+      }
+    });
+  }
+
+  if (bracketDiffCloseBtn && bracketDiffModal) {
+    bracketDiffCloseBtn.addEventListener('click', () => { bracketDiffModal.hidden = true; });
+  }
+  if (bracketDiffModal) {
+    bracketDiffModal.addEventListener('click', (e) => { if (e.target === bracketDiffModal) bracketDiffModal.hidden = true; });
+  }
+
+  if (saveDraftBtn) saveDraftBtn.addEventListener('click', () => saveBracketDraft());
+  const publishBtn = document.getElementById('bracket-publish-btn');
+  if (publishBtn) publishBtn.addEventListener('click', () => publishBracketToStats());
+
+  tabPreview.addEventListener('click', () => {
+    setBracketTab('preview');
+    loadBracketPreview();
+  });
+  tabEdit.addEventListener('click', () => {
+    setBracketTab('edit');
+    loadBracketEditor();
+    refreshBracketSuggestionsList();
+  });
+  if (refreshBtn) refreshBtn.addEventListener('click', () => loadBracketPreview());
+  loadBracketPreview();
+}
+
 window.addEventListener('DOMContentLoaded', () => {
   if (window.MOTION_HUB_BUILD === 'master') {
     document.body.classList.add('is-master');
@@ -4180,5 +4915,6 @@ window.addEventListener('DOMContentLoaded', () => {
   setupNotesForm();
   setupRulesEditor();
   setupStatsEditor();
+  setupBracketSection();
 });
 
